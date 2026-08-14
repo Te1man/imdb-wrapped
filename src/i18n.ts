@@ -727,7 +727,7 @@ export const copy: Record<Lang, Copy> = {
     yearAllTimeMovies: "фильмы пользователя за всё время",
     yearAllTimeSeries: "сериалы пользователя за всё время",
     kindLabel: "Каталог",
-    kindAll: "Все вместе",
+    kindAll: "Всё вместе",
     kindMovies: "Фильмы",
     kindSeries: "Сериалы",
     wrapped: "Wrapped",

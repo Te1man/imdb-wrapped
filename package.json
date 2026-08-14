@@ -6,11 +6,12 @@
   "description": "Personal IMDb Wrapped — fork, paste your profile URL, drop in your export CSVs.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:imdb": "VITE_BASE=/imdb/ vite build",
+    "og": "python3 scripts/build_og.py",
+    "build": "python3 scripts/build_og.py && vite build",
+    "build:imdb": "python3 scripts/build_og.py && VITE_BASE=/imdb/ vite build",
     "preview": "vite preview",
-    "data": "python3 scripts/build_stats.py --fast && python3 scripts/fetch_watchlist.py",
-    "data:full": "python3 scripts/build_stats.py && python3 scripts/fetch_watchlist.py --live",
+    "data": "python3 scripts/build_stats.py --fast && python3 scripts/fetch_watchlist.py && python3 scripts/build_og.py",
+    "data:full": "python3 scripts/build_stats.py && python3 scripts/fetch_watchlist.py --live && python3 scripts/build_og.py",
     "watchlist": "python3 scripts/fetch_watchlist.py --live",
     "fetch": "python3 scripts/fetch_ratings.py"
   },

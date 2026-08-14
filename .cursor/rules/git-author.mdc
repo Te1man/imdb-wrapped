@@ -1,0 +1,13 @@
+---
+description: Commits and GitHub identity must be Te1man only
+alwaysApply: true
+---
+
+# Git identity
+
+This repo has one author: **Te1man**. Nobody else.
+
+- Author and committer: `Te1man <49500410+Te1man@users.noreply.github.com>`
+- Never add `Co-authored-by`, Cursor Agent, cursoragent, PodcastsRu, or any other person
+- Never add collaborators, extra GitHub users, or attribution trailers unless Telman explicitly asks
+- If a commit would get a Cursor trailer, strip it before pushing

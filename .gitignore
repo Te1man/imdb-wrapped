@@ -5,5 +5,6 @@ dist
 __pycache__
 data/cache
 data/raw
+public/og/*.jpg
 .vite
 .env

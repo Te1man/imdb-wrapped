@@ -1191,12 +1191,14 @@ function YearSelect({
 }
 
 function ShareButton({ year }: { year: string }) {
-  const { t } = useLocale();
+  const { t, lang } = useLocale();
   const [copied, setCopied] = useState(false);
 
   async function onShare() {
-    const url = window.location.href;
-    const payload = { title: document.title, text: t.shareText(t.displayName, year), url };
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", lang);
+    const href = url.toString();
+    const payload = { title: document.title, text: t.shareText(t.displayName, year), url: href };
     if (typeof navigator.share === "function") {
       try {
         await navigator.share(payload);
@@ -1206,11 +1208,11 @@ function ShareButton({ year }: { year: string }) {
       }
     }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(href);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2200);
     } catch {
-      window.prompt(t.share, url);
+      window.prompt(t.share, href);
     }
   }
 
