@@ -214,15 +214,21 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .hero-identity {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
+}
+.hero-byline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 8px 0 0;
 }
 .hero-byline {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: fit-content;
-  max-width: 100%;
-  margin: 8px 0 0;
+  min-width: 0;
   color: var(--muted);
   font-size: 17px;
   line-height: 1.3;
@@ -236,6 +242,26 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 .hero-byline:hover { color: var(--ink); }
 .hero-kicker { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px 0 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #0c0c0c;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.share-btn:hover { filter: brightness(1.06); }
+.share-btn.copied {
+  background: rgba(245, 197, 24, 0.14);
+  color: var(--yellow);
+}
 
 main {
   max-width: var(--page-max);

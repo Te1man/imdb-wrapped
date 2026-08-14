@@ -1190,6 +1190,51 @@ function YearSelect({
   );
 }
 
+function ShareButton({ year }: { year: string }) {
+  const { t } = useLocale();
+  const [copied, setCopied] = useState(false);
+
+  async function onShare() {
+    const url = window.location.href;
+    const payload = { title: document.title, text: t.shareText(t.displayName, year), url };
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share(payload);
+        return;
+      } catch (err) {
+        if ((err as DOMException).name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch {
+      window.prompt(t.share, url);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`share-btn${copied ? " copied" : ""}`}
+      onClick={onShare}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 3v11M7.5 7.5 12 3l4.5 4.5M5 14.5v4A1.5 1.5 0 0 0 6.5 20h11A1.5 1.5 0 0 0 19 18.5v-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {copied ? t.shareCopied : t.share}
+    </button>
+  );
+}
+
 function KindSwitch({
   value,
   onChange,
@@ -1529,10 +1574,13 @@ export default function App() {
         <div className="hero-copy">
           <div className="hero-identity">
             <YearSelect value={year} years={wrapped.years} onChange={setYear} />
-            <a className="hero-byline" href={wrapped.profile.url} target="_blank" rel="noreferrer">
-              <img src={wrapped.profile.avatar} alt="" />
-              <span>{yearByline(year, stats.toDate, kind, t)}</span>
-            </a>
+            <div className="hero-byline-row">
+              <a className="hero-byline" href={wrapped.profile.url} target="_blank" rel="noreferrer">
+                <img src={wrapped.profile.avatar} alt="" />
+                <span>{yearByline(year, stats.toDate, kind, t)}</span>
+              </a>
+              <ShareButton year={year} />
+            </div>
             <p className="hero-kicker">
               <CountUp value={stats.count} /> {t.heroRated("0", stats.count).replace(/^0\s*/, "")}
               {stats.hours ? (

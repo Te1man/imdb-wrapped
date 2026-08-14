@@ -551,6 +551,9 @@ export type Copy = {
   footerCredit: string;
   heatTitle: (date: string, n: number) => string;
   language: string;
+  share: string;
+  shareCopied: string;
+  shareText: (name: string, year: string) => string;
 };
 
 export const copy: Record<Lang, Copy> = {
@@ -705,6 +708,10 @@ export const copy: Record<Lang, Copy> = {
     footerCredit: "Built from public IMDb ratings for ",
     heatTitle: (date, n) => `${date}: ${n} ${n === 1 ? "title" : "titles"}`,
     language: "Language",
+    share: "Share",
+    shareCopied: "Link copied",
+    shareText: (name, year) =>
+      year === "all" ? `${name} · IMDb Wrapped` : `${name} · ${year} · IMDb Wrapped`,
   },
   ru: {
     allTime: "За всё время",
@@ -854,6 +861,10 @@ export const copy: Record<Lang, Copy> = {
     heatTitle: (date, n) =>
       `${date}: ${n} ${pluralRu(n, "картина", "картины", "картин")}`,
     language: "Язык",
+    share: "Поделиться",
+    shareCopied: "Ссылка скопирована",
+    shareText: (name, year) =>
+      year === "all" ? `${name} · IMDb Wrapped` : `${name} · ${year} · IMDb Wrapped`,
   },
 };
 
