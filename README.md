@@ -23,17 +23,13 @@ Open `config.json` and set:
 {
   "imdbUrl": "https://www.imdb.com/user/p.xxxxxxxx",
   "displayName": {
-    "en": "Alex",
-    "ru": "Алекс",
-    "ruGenitive": "Алекса"
+    "en": "Alex"
   },
   "telegram": ""
 }
 ```
 
-Use the URL from the browser after you open **your profile** — it should look like `/user/p.…`, not the old `ur…` id. Ratings and the watchlist must be **public**.
-
-`ruGenitive` is the Russian genitive (“год Алекса”). Leave `telegram` empty, or put `https://t.me/yourname`.
+Use the URL from the browser after you open **your profile** — it should look like `/user/p.…`, not the old `ur…` id. Ratings and the watchlist must be **public**. Leave `telegram` empty, or put `https://t.me/yourname`.
 
 3. Export two CSVs from IMDb and replace the files in `data/`:
 
