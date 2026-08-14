@@ -50,8 +50,6 @@ npm run data:full
 npm run dev
 ```
 
-Open http://localhost:5173/
-
 `data:full` talks to IMDb’s public GraphQL API (posters, people, badges, lists). First run can take a few minutes if you have thousands of ratings.
 
 ## Commands
@@ -71,14 +69,3 @@ npm run build        # production bundle
 - Public IMDb ratings (and watchlist, if you want that block)
 
 MIT. IMDb is a trademark of IMDb.com, Inc. This is an unofficial fan project and is not affiliated with IMDb.
-
----
-
-## По-русски
-
-Форкни репозиторий, вставь ссылку на свой профиль IMDb в `config.json`, положи туда свои CSV экспорта — получится такая же страница, только с твоими оценками. Живой пример: [telman.ru/imdb](https://telman.ru/imdb).
-
-1. `cp config.example.json config.json`
-2. В `imdbUrl` — адрес из браузера (`/user/p.…`). Оценки и вотчлист должны быть открытыми.
-3. Экспорт оценок → `data/ratings.csv`, вотчлиста → `data/watchlist.csv`
-4. `npm install && npm run data:full && npm run dev`
