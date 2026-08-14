@@ -1,9 +1,11 @@
 export type TitleCard = {
   id?: string | null;
   title: string;
+  titleRu?: string | null;
   year?: number | null;
   type?: string;
   poster?: string | null;
+  posterRu?: string | null;
   userRating?: number | null;
   imdbRating?: number | null;
   votes?: number | null;

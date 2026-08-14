@@ -268,17 +268,21 @@ function useRevealOnScroll(resetKey: string) {
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
+          // threshold 0: any pixel visible. Tall mobile sections (watchlist etc.)
+          // never reach 0.16 of their own height inside the viewport.
           if (!entry.isIntersecting) continue;
           entry.target.classList.add("is-in");
           io.unobserve(entry.target);
         }
       },
-      { threshold: 0.16, rootMargin: "0px 0px -8% 0px" },
+      { threshold: 0, rootMargin: "0px 0px -6% 0px" },
     );
     const vh = window.innerHeight;
     for (const node of nodes) {
       if (node.classList.contains("is-in")) continue;
-      if (reduced || node.getBoundingClientRect().top < vh * 0.9) {
+      const rect = node.getBoundingClientRect();
+      const onScreen = rect.top < vh * 0.92 && rect.bottom > vh * 0.08;
+      if (reduced || onScreen) {
         node.classList.add("is-in");
       } else {
         io.observe(node);
@@ -376,6 +380,7 @@ function PosterRow({
   watchlistedIds?: Set<string>;
   className?: string;
 }) {
+  const { lang } = useLocale();
   if (!items.length) return null;
   return (
     <section className={className ? `block ${className}` : "block"}>
@@ -384,8 +389,8 @@ function PosterRow({
         {items.map((t) => (
           <Poster
             key={`${t.id}-${t.title}-${t.ratedOn}`}
-            src={t.poster}
-            title={t.title}
+            src={(lang === "ru" && t.posterRu) || t.poster}
+            title={(lang === "ru" && t.titleRu) || t.title}
             year={t.year}
             rating={t.userRating}
             href={titleHref(t)}
@@ -409,12 +414,17 @@ function ToggledPosterRow({
   watchlistedIds?: Set<string>;
   className?: string;
 }) {
+  const { lang } = useLocale();
   const hasA = a.items.length > 0;
   const hasB = b.items.length > 0;
   const [side, setSide] = useState<"a" | "b">(hasA ? "a" : "b");
   const current = (side === "b" && hasB) || !hasA ? b : a;
   const active = current === b ? "b" : "a";
   if (!hasA && !hasB) return null;
+  const posterOf = (card: TitleCard) =>
+    (lang === "ru" && card.posterRu) || card.poster;
+  const titleOf = (card: TitleCard) =>
+    (lang === "ru" && card.titleRu) || card.title;
   return (
     <section className={className ? `block ${className}` : "block"}>
       {hasA && hasB ? (
@@ -443,8 +453,8 @@ function ToggledPosterRow({
         {current.items.map((t) => (
           <Poster
             key={`${t.id}-${t.title}-${t.ratedOn}`}
-            src={t.poster}
-            title={t.title}
+            src={posterOf(t)}
+            title={titleOf(t)}
             year={t.year}
             rating={t.userRating}
             href={titleHref(t)}
@@ -580,7 +590,7 @@ function BestOfYear({
   watchlistedIds?: Set<string>;
   kind: CatalogKind;
 }) {
-  const { t } = useLocale();
+  const { lang, t } = useLocale();
   const canBest = best.length >= 2;
   const canWorst = worst.length >= 2;
   const [mode, setMode] = useState<"best" | "worst">(canBest ? "best" : "worst");
@@ -591,68 +601,70 @@ function BestOfYear({
   const nine = items.slice(1, 10);
   const ten = items.slice(10, 20);
   const count = Math.min(20, items.length);
+  const posterOf = (card: TitleCard) =>
+    (lang === "ru" && card.posterRu) || card.poster;
+  const titleOf = (card: TitleCard) =>
+    (lang === "ru" && card.titleRu) || card.title;
   return (
     <section className="block bestof">
+      <div className="bestof-head">
+        {canBest && canWorst ? (
+          <div className="text-toggle is-heading" role="group">
+            <button
+              type="button"
+              className={!isWorst ? "on" : ""}
+              aria-pressed={!isWorst}
+              onClick={() => setMode("best")}
+            >
+              {t.bestOf(year)}
+            </button>
+            <button
+              type="button"
+              className={isWorst ? "on" : ""}
+              aria-pressed={isWorst}
+              onClick={() => setMode("worst")}
+            >
+              {t.worstOf(year)}
+            </button>
+          </div>
+        ) : (
+          <h2>{isWorst ? t.worstOf(year) : t.bestOf(year)}</h2>
+        )}
+        <p>
+          <img src={wrapped.profile.avatar} alt="" />
+          <span>{t.bestOfItems(count, kind)}</span>
+        </p>
+      </div>
       <div className="bestof-lead">
         <Poster
-          src={lead.poster}
-          title={lead.title}
+          src={posterOf(lead)}
+          title={titleOf(lead)}
           year={lead.year}
           rating={lead.userRating}
           href={titleHref(lead)}
           watchlisted={lead.id ? watchlistedIds?.has(lead.id) : false}
         />
       </div>
-      <div className="bestof-side">
-        <div className="bestof-head">
-          {canBest && canWorst ? (
-            <div className="text-toggle is-heading" role="group">
-              <button
-                type="button"
-                className={!isWorst ? "on" : ""}
-                aria-pressed={!isWorst}
-                onClick={() => setMode("best")}
-              >
-                {t.bestOf(year)}
-              </button>
-              <button
-                type="button"
-                className={isWorst ? "on" : ""}
-                aria-pressed={isWorst}
-                onClick={() => setMode("worst")}
-              >
-                {t.worstOf(year)}
-              </button>
-            </div>
-          ) : (
-            <h2>{isWorst ? t.worstOf(year) : t.bestOf(year)}</h2>
-          )}
-          <p>
-            <img src={wrapped.profile.avatar} alt="" />
-            <span>{t.bestOfItems(count, kind)}</span>
-          </p>
-        </div>
-        <div className="bestof-nine">
-          {nine.map((card) => (
-            <Poster
-              key={card.id || card.title}
-              src={card.poster}
-              title={card.title}
-              year={card.year}
-              rating={card.userRating}
-              href={titleHref(card)}
-              watchlisted={card.id ? watchlistedIds?.has(card.id) : false}
-            />
-          ))}
-        </div>
+      <div className="bestof-nine">
+        {nine.map((card) => (
+          <Poster
+            key={card.id || card.title}
+            src={posterOf(card)}
+            title={titleOf(card)}
+            year={card.year}
+            rating={card.userRating}
+            href={titleHref(card)}
+            watchlisted={card.id ? watchlistedIds?.has(card.id) : false}
+          />
+        ))}
       </div>
       {ten.length > 0 && (
         <div className="bestof-ten">
           {ten.map((card) => (
             <Poster
               key={card.id || card.title}
-              src={card.poster}
-              title={card.title}
+              src={posterOf(card)}
+              title={titleOf(card)}
               year={card.year}
               rating={card.userRating}
               href={titleHref(card)}
@@ -681,6 +693,10 @@ function MilestonesBlock({
   const { lang, t } = useLocale();
   if (!stats.first && !stats.last) return null;
   const marks = stats.milestones || [];
+  const posterOf = (card: TitleCard) =>
+    (lang === "ru" && card.posterRu) || card.poster;
+  const titleOf = (card: TitleCard) =>
+    (lang === "ru" && card.titleRu) || card.title;
   return (
     <section className="block milestones">
       <h2>{t.milestones}</h2>
@@ -689,8 +705,8 @@ function MilestonesBlock({
           <article className="milestone-end">
             <h3>{t.firstRated(kind)}</h3>
             <Poster
-              src={stats.first.poster}
-              title={stats.first.title}
+              src={posterOf(stats.first)}
+              title={titleOf(stats.first)}
               year={stats.first.year}
               rating={stats.first.userRating}
               href={titleHref(stats.first)}
@@ -705,8 +721,8 @@ function MilestonesBlock({
               {marks.map((card) => (
                 <article key={`${card.n}-${card.id || card.title}`} className="milestone-card">
                   <Poster
-                    src={card.poster}
-                    title={card.title}
+                    src={posterOf(card)}
+                    title={titleOf(card)}
                     year={card.year}
                     rating={card.userRating}
                     href={titleHref(card)}
@@ -722,8 +738,8 @@ function MilestonesBlock({
           <article className="milestone-end last">
             <h3>{t.mostRecent(kind)}</h3>
             <Poster
-              src={stats.last.poster}
-              title={stats.last.title}
+              src={posterOf(stats.last)}
+              title={titleOf(stats.last)}
               year={stats.last.year}
               rating={stats.last.userRating}
               href={titleHref(stats.last)}

@@ -375,7 +375,13 @@ def load_all() -> list[dict]:
     return items
 
 
-def http_json(url: str, data: dict | None = None, retries: int = 3) -> dict:
+def http_json(
+    url: str,
+    data: dict | None = None,
+    retries: int = 3,
+    language: str = "en-US",
+    country: str | None = None,
+) -> dict:
     body = None
     headers = {"User-Agent": UA, "Accept": "application/json"}
     if data is not None:
@@ -385,8 +391,10 @@ def http_json(url: str, data: dict | None = None, retries: int = 3) -> dict:
             "origin": "https://www.imdb.com",
             "referer": "https://www.imdb.com/",
             "x-imdb-client-name": "imdb-web-next",
-            "x-imdb-user-language": "en-US",
+            "x-imdb-user-language": language,
         })
+        if country:
+            headers["x-imdb-user-country"] = country
     req = urllib.request.Request(url, data=body, headers=headers)
     last = None
     for i in range(retries):
@@ -399,11 +407,16 @@ def http_json(url: str, data: dict | None = None, retries: int = 3) -> dict:
     raise RuntimeError(last)
 
 
-def gql(query: str, variables: dict | None = None) -> dict:
+def gql(
+    query: str,
+    variables: dict | None = None,
+    language: str = "en-US",
+    country: str | None = None,
+) -> dict:
     payload: dict = {"query": query}
     if variables:
         payload["variables"] = variables
-    return http_json(GQL_URL, payload)
+    return http_json(GQL_URL, payload, language=language, country=country)
 
 
 PROFILE_QUERY = """
@@ -1015,11 +1028,55 @@ query($ids: [ID!]!) {
 }
 """
 
+LOCAL_QUERY = """
+query($ids: [ID!]!) {
+  titles(ids: $ids) {
+    id
+    titleText { text }
+    primaryImage { url }
+  }
+}
+"""
+
 
 def poster_thumb(url: str | None, width: int = 320) -> str | None:
     if not url:
         return None
     return re.sub(r"\._V1_.*$", f"._V1_UX{width}.jpg", url)
+
+
+def fetch_ru_titles(ids: list[str]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for i in range(0, len(ids), 40):
+        batch = ids[i : i + 40]
+        try:
+            data = gql(LOCAL_QUERY, {"ids": batch}, language="ru-RU", country="RU")
+            for t in (data.get("data") or {}).get("titles") or []:
+                if t and t.get("id"):
+                    out[t["id"]] = t
+        except Exception as exc:  # noqa: BLE001
+            print(f"  gql ru batch fail: {exc}", flush=True)
+        time.sleep(0.08)
+    return out
+
+
+def apply_ru_locale(items: list[dict]) -> None:
+    ids = sorted({tid for it in items if (tid := it.get("id"))})
+    if not ids:
+        return
+    print(f"GraphQL RU titles {len(ids)}...", flush=True)
+    local = fetch_ru_titles(ids)
+    for it in items:
+        tid = it.get("id")
+        t = local.get(tid or "")
+        if not t:
+            continue
+        title_ru = ((t.get("titleText") or {}).get("text") or "").strip()
+        poster_ru = poster_thumb((t.get("primaryImage") or {}).get("url"))
+        if title_ru and title_ru != it.get("title"):
+            it["titleRu"] = title_ru
+        if poster_ru and poster_ru != it.get("poster"):
+            it["posterRu"] = poster_ru
 
 
 def spoken_langs(title: dict) -> list[dict]:
@@ -1202,6 +1259,7 @@ def fast_enrich(items: list[dict]) -> list[dict]:
 def enrich(items: list[dict], graphql: bool = True) -> list[dict]:
     items = fast_enrich(items)
     if not graphql:
+        apply_ru_locale(items)
         return items
     CACHE.mkdir(parents=True, exist_ok=True)
     id_cache_path = CACHE / "id-map.json"
@@ -1380,10 +1438,8 @@ def enrich(items: list[dict], graphql: bool = True) -> list[dict]:
             it["interests"] = interests_of(st)
         if not it.get("keywords"):
             it["keywords"] = keywords_of(st)
+    apply_ru_locale(items)
     return items
-
-
-IMDB_GENRES = {
     "Action",
     "Adventure",
     "Animation",
@@ -1524,7 +1580,7 @@ def is_best_title(item: dict) -> bool:
 
 
 def compact_title(item: dict) -> dict:
-    return {
+    out = {
         "id": item.get("id"),
         "title": item["title"],
         "year": item.get("releaseYear"),
@@ -1541,6 +1597,11 @@ def compact_title(item: dict) -> dict:
         "episode": item.get("episode"),
         "url": f"https://www.imdb.com/title/{item['id']}/" if item.get("id") else None,
     }
+    if item.get("titleRu"):
+        out["titleRu"] = item["titleRu"]
+    if item.get("posterRu"):
+        out["posterRu"] = item["posterRu"]
+    return out
 
 
 def top_n(items: list[dict], key, reverse=True, n=10, require=None) -> list[dict]:
