@@ -4,7 +4,7 @@ A personal year-in-review from your public IMDb ratings — Letterboxd Wrapped e
 
 Fork it, paste your profile URL, drop in your export CSVs, and you get the same page with your films, series, map, directors, watchlist, and the rest.
 
-Live demo data in this repo is [telman3D](https://www.imdb.com/user/p.myngzks6b5tydnbl7kkgmnpmqy).
+Live demo: [telman.ru/imdb](https://telman.ru/imdb) — data from [telman3D](https://www.imdb.com/user/p.myngzks6b5tydnbl7kkgmnpmqy).
 
 ## Make it yours
 
@@ -74,7 +74,7 @@ MIT. IMDb is a trademark of IMDb.com, Inc. This is an unofficial fan project and
 
 ## По-русски
 
-Форкни репозиторий, вставь ссылку на свой профиль IMDb в `config.json`, положи туда свои CSV экспорта — получится такая же страница, только с твоими оценками.
+Форкни репозиторий, вставь ссылку на свой профиль IMDb в `config.json`, положи туда свои CSV экспорта — получится такая же страница, только с твоими оценками. Живой пример: [telman.ru/imdb](https://telman.ru/imdb).
 
 1. `cp config.example.json config.json`
 2. В `imdbUrl` — адрес из браузера (`/user/p.…`). Оценки и вотчлист должны быть открытыми.

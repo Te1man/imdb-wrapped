@@ -1521,6 +1521,7 @@ export default function App() {
   }, [year, kind, stats.label, t.allTime, t.displayName, t.kindMovies, t.kindSeries]);
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     let alive = true;
     const pull = () => {
       fetch("/api/watchlist")
