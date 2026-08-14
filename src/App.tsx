@@ -403,6 +403,50 @@ function PosterRow({
   );
 }
 
+function HeadingToggle({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const active = options.find((opt) => opt.value === value)?.label ?? options[0]?.label ?? "";
+  return (
+    <>
+      <div className="text-toggle is-heading heading-toggle-buttons" role="group">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            className={value === opt.value ? "on" : ""}
+            aria-pressed={value === opt.value}
+            onClick={() => onChange(opt.value)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <label className="heading-select">
+        <span className="sr-only">{active}</span>
+        <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={active}>
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <span className="heading-select-caret" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path fill="currentColor" d="M7 10l5 5 5-5z" />
+          </svg>
+        </span>
+      </label>
+    </>
+  );
+}
+
 function ToggledPosterRow({
   a,
   b,
@@ -428,24 +472,14 @@ function ToggledPosterRow({
   return (
     <section className={className ? `block ${className}` : "block"}>
       {hasA && hasB ? (
-        <div className="text-toggle is-heading" role="group">
-          <button
-            type="button"
-            className={active === "a" ? "on" : ""}
-            aria-pressed={active === "a"}
-            onClick={() => setSide("a")}
-          >
-            {a.heading}
-          </button>
-          <button
-            type="button"
-            className={active === "b" ? "on" : ""}
-            aria-pressed={active === "b"}
-            onClick={() => setSide("b")}
-          >
-            {b.heading}
-          </button>
-        </div>
+        <HeadingToggle
+          value={active}
+          onChange={(v) => setSide(v === "b" ? "b" : "a")}
+          options={[
+            { value: "a", label: a.heading },
+            { value: "b", label: b.heading },
+          ]}
+        />
       ) : (
         <h2>{current.heading}</h2>
       )}
@@ -609,24 +643,14 @@ function BestOfYear({
     <section className="block bestof">
       <div className="bestof-head">
         {canBest && canWorst ? (
-          <div className="text-toggle is-heading" role="group">
-            <button
-              type="button"
-              className={!isWorst ? "on" : ""}
-              aria-pressed={!isWorst}
-              onClick={() => setMode("best")}
-            >
-              {t.bestOf(year)}
-            </button>
-            <button
-              type="button"
-              className={isWorst ? "on" : ""}
-              aria-pressed={isWorst}
-              onClick={() => setMode("worst")}
-            >
-              {t.worstOf(year)}
-            </button>
-          </div>
+          <HeadingToggle
+            value={isWorst ? "worst" : "best"}
+            onChange={(v) => setMode(v === "worst" ? "worst" : "best")}
+            options={[
+              { value: "best", label: t.bestOf(year) },
+              { value: "worst", label: t.worstOf(year) },
+            ]}
+          />
         ) : (
           <h2>{isWorst ? t.worstOf(year) : t.bestOf(year)}</h2>
         )}
