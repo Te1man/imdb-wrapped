@@ -30,6 +30,7 @@ CTX = ssl.create_default_context()
 W, H = 1200, 630
 SCALE = 2
 CW, CH = W * SCALE, H * SCALE
+CACHE_BUST = "2"
 
 YELLOW = (245, 197, 24, 255)
 INK = (245, 245, 245, 255)
@@ -162,28 +163,24 @@ def round_poster(im: Image.Image, size: tuple[int, int], radius: int) -> Image.I
 
 def mosaic(posters: list[Image.Image]) -> Image.Image:
     cols = 10
-    cell_w = math.ceil(CW / cols)
-    cell_h = math.ceil(cell_w * 1.5)
-    rows = math.ceil(CH / cell_h) + 1
+    gap = 4
+    cell_w = (CW - gap * (cols + 1)) // cols
+    cell_h = round(cell_w * 1.5)
+    rows = math.ceil((CH + gap) / (cell_h + gap))
     need = cols * rows
     tiles = posters[:] or [Image.new("RGB", (cell_w, cell_h), (28, 28, 28))]
     while len(tiles) < need:
         tiles.extend(posters or tiles)
-    layer = Image.new("RGBA", (cols * cell_w, rows * cell_h), BG)
-    radius = max(4, round(8 * SCALE / 2))
+    layer = Image.new("RGBA", (CW, rows * (cell_h + gap) + gap), BG)
+    radius = 6
     for i in range(need):
-        x = (i % cols) * cell_w
-        y = (i // cols) * cell_h
-        tile = round_poster(tiles[i], (cell_w - 6, cell_h - 6), radius)
-        layer.paste(tile, (x + 3, y + 3), tile)
-    zoomed = layer.resize(
-        (math.ceil(layer.width * 1.08), math.ceil(layer.height * 1.08)),
-        Image.Resampling.LANCZOS,
-    )
-    left = (zoomed.width - CW) // 2
-    top = (zoomed.height - CH) // 4
-    crop = zoomed.crop((left, top, left + CW, top + CH))
-    return ImageEnhance.Color(crop).enhance(0.85)
+        col, row = i % cols, i // cols
+        x = gap + col * (cell_w + gap)
+        y = gap + row * (cell_h + gap)
+        tile = round_poster(tiles[i], (cell_w, cell_h), radius)
+        layer.paste(tile, (x, y), tile)
+    crop = layer.crop((0, 0, CW, CH))
+    return ImageEnhance.Color(crop).enhance(0.88)
 
 
 def shade(size: tuple[int, int]) -> Image.Image:
@@ -192,12 +189,12 @@ def shade(size: tuple[int, int]) -> Image.Image:
     pix = grad.load()
     for y in range(h):
         t = y / max(1, h - 1)
-        if t < 0.42:
-            a = 0.22 + (0.38 - 0.22) * (t / 0.42)
-        elif t < 0.72:
-            a = 0.38 + (0.78 - 0.38) * ((t - 0.42) / 0.30)
+        if t < 0.38:
+            a = 0.28 + (0.42 - 0.28) * (t / 0.38)
+        elif t < 0.68:
+            a = 0.42 + (0.82 - 0.42) * ((t - 0.38) / 0.30)
         else:
-            a = 0.78 + (0.96 - 0.78) * ((t - 0.72) / 0.28)
+            a = 0.82 + (0.97 - 0.82) * ((t - 0.68) / 0.32)
         pix[0, y] = int(255 * a)
     overlay = Image.new("RGBA", size, (12, 12, 12, 255))
     overlay.putalpha(grad.resize((w, h), Image.Resampling.BILINEAR))
@@ -205,61 +202,57 @@ def shade(size: tuple[int, int]) -> Image.Image:
 
 
 def text_size(draw: ImageDraw.ImageDraw, text: str, face: ImageFont.FreeTypeFont) -> tuple[int, int]:
-    box = draw.textbbox((0, 0), text, font=face)
+    box = draw.textbbox((0, 0), text, font=face, anchor="lt")
     return box[2] - box[0], box[3] - box[1]
 
 
-def italic_label(text: str, face: ImageFont.FreeTypeFont, fill: tuple[int, int, int, int], shear: float = 0.22) -> Image.Image:
-    probe = ImageDraw.Draw(Image.new("RGBA", (8, 8), (0, 0, 0, 0)))
-    tw, th = text_size(probe, text, face)
-    pad = 8
-    src = Image.new("RGBA", (tw + pad * 2, th + pad * 2), (0, 0, 0, 0))
-    ImageDraw.Draw(src).text((pad, pad), text, font=face, fill=fill)
-    extra = int(src.height * shear)
-    return src.transform(
-        (src.width + extra, src.height),
-        Image.Transform.AFFINE,
-        (1, -shear, extra, 0, 1, 0),
-        resample=Image.Resampling.BICUBIC,
-    )
+def draw_imdb_mark(base: Image.Image, x: int, cy: float, face: ImageFont.FreeTypeFont) -> tuple[int, int]:
+    draw = ImageDraw.Draw(base)
+    pad_x, pad_y = 12 * SCALE, 8 * SCALE
+    tw, th = text_size(draw, "IMDb", face)
+    w = tw + pad_x * 2
+    h = th + pad_y * 2
+    y = int(round(cy - h / 2))
+    draw.rounded_rectangle((x, y, x + w, y + h), radius=6 * SCALE, fill=YELLOW)
+    draw.text((x + w / 2, y + h / 2), "IMDb", font=face, fill=MARK_INK, anchor="mm")
+    return w, h
 
 
-def draw_imdb_mark(base: Image.Image, x: int, y: int, face: ImageFont.FreeTypeFont) -> int:
-    label = italic_label("IMDb", face, MARK_INK)
-    pad_x, pad_y = 14 * SCALE, 6 * SCALE
-    box = (x, y, x + label.width + pad_x * 2, y + label.height + pad_y * 2 - 4 * SCALE)
-    ImageDraw.Draw(base).rounded_rectangle(box, radius=8 * SCALE, fill=YELLOW)
-    base.alpha_composite(label, (x + pad_x, y + pad_y - 2 * SCALE))
-    return box[2] - box[0]
-
-
-def draw_kind_switch(base: Image.Image, lang: str, kind: str, face: ImageFont.FreeTypeFont) -> None:
+def draw_kind_switch(base: Image.Image, lang: str, kind: str, face: ImageFont.FreeTypeFont, cy: float) -> None:
     labels = [KIND_LABELS[lang][k] for k in KINDS]
     keys = list(KINDS)
     probe = ImageDraw.Draw(base)
-    pad_x, pad_y, gap = 28 * SCALE, 12 * SCALE, 4 * SCALE
-    widths = [text_size(probe, label, face)[0] + 36 * SCALE for label in labels]
-    bar_h = 44 * SCALE
-    bar_w = sum(widths) + gap * (len(labels) - 1) + pad_x * 2
+    inset = 4 * SCALE
+    item_pad = 18 * SCALE
+    gap = 2 * SCALE
+    bar_h = 36 * SCALE
+    widths = [text_size(probe, label, face)[0] + item_pad * 2 for label in labels]
+    bar_w = sum(widths) + gap * (len(labels) - 1) + inset * 2
     x0 = CW - 64 * SCALE - bar_w
-    y0 = 40 * SCALE
+    y0 = int(round(cy - bar_h / 2))
     ImageDraw.Draw(base).rounded_rectangle(
         (x0, y0, x0 + bar_w, y0 + bar_h),
         radius=bar_h // 2,
-        fill=(12, 12, 12, 148),
-        outline=(255, 255, 255, 36),
+        fill=(12, 12, 12, 170),
+        outline=(255, 255, 255, 40),
         width=2,
     )
-    cursor = x0 + pad_x
+    cursor = x0 + inset
+    pill_h = bar_h - inset * 2
     for key, label, tw in zip(keys, labels, widths):
         on = key == kind
-        pill = (cursor, y0 + gap + 2, cursor + tw, y0 + bar_h - gap - 2)
+        pill = (cursor, y0 + inset, cursor + tw, y0 + inset + pill_h)
         if on:
-            ImageDraw.Draw(base).rounded_rectangle(pill, radius=bar_h // 2, fill=YELLOW)
-        lw, lh = text_size(probe, label, face)
-        tx = cursor + (tw - lw) // 2
-        ty = y0 + (bar_h - lh) // 2 - 2 * SCALE
-        ImageDraw.Draw(base).text( (tx, ty), label, font=face, fill=MARK_INK if on else (245, 245, 245, 200))
+            ImageDraw.Draw(base).rounded_rectangle(pill, radius=pill_h // 2, fill=YELLOW)
+        cx = cursor + tw / 2
+        cy_pill = y0 + bar_h / 2
+        ImageDraw.Draw(base).text(
+            (cx, cy_pill),
+            label,
+            font=face,
+            fill=MARK_INK if on else (245, 245, 245, 210),
+            anchor="mm",
+        )
         cursor += tw + gap
 
 
@@ -368,41 +361,41 @@ def compose(base: Image.Image, avatar: Image.Image | None, faces: dict, text: di
     canvas = base.copy()
     draw = ImageDraw.Draw(canvas)
     pad = 64 * SCALE
-    mark_w = draw_imdb_mark(canvas, pad, 42 * SCALE, faces["mark"])
+    brand_cy = 56 * SCALE
+    mark_w, mark_h = draw_imdb_mark(canvas, pad, brand_cy, faces["mark"])
     draw.text(
-        (pad + mark_w + 14 * SCALE, 52 * SCALE),
+        (pad + mark_w + 16 * SCALE, brand_cy),
         "Wrapped",
         font=faces["wrapped"],
         fill=MUTED,
+        anchor="lm",
     )
-    draw_kind_switch(canvas, text["lang"], text["kind"], faces["pill"])
+    draw_kind_switch(canvas, text["lang"], text["kind"], faces["pill"], brand_cy)
 
     headline = text["headline"]
     if text["allTime"]:
         face = faces["all_ru"] if text["lang"] == "ru" else faces["all_en"]
     else:
         face = faces["bebas"]
-    hw, hh = text_size(draw, headline, face)
-    max_w = CW - pad * 2
-    if hw > max_w and not text["allTime"]:
-        # shrink numeric year if needed; shouldn't happen
-        face = faces["bebas_sm"]
-        hw, hh = text_size(draw, headline, face)
-    year_y = CH - pad - 118 * SCALE - hh
-    draw.text((pad - (6 * SCALE if not text["allTime"] else 0), year_y), headline, font=face, fill=INK)
 
-    row_y = year_y + hh - (4 * SCALE if text["allTime"] else 8 * SCALE)
+    bottom = CH - 56 * SCALE
+    draw.text((pad, bottom), text["kicker"], font=faces["inter_bold"], fill=INK, anchor="ld")
+    kicker_top = draw.textbbox((pad, bottom), text["kicker"], font=faces["inter_bold"], anchor="ld")[1]
+
+    av_size = 48 * SCALE
+    gap = 16 * SCALE
+    row_bottom = kicker_top - gap
+    row_top = row_bottom - av_size
+    row_cy = (row_top + row_bottom) / 2
     text_x = pad
-    av_size = 44 * SCALE
     if avatar is not None:
         av = circle(avatar, av_size)
-        ring = Image.new("RGBA", (av_size + 4, av_size + 4), (0, 0, 0, 0))
-        ImageDraw.Draw(ring).ellipse((0, 0, av_size + 3, av_size + 3), outline=(255, 255, 255, 36), width=2)
-        canvas.alpha_composite(ring, (pad - 2, row_y + 2))
-        canvas.alpha_composite(av, (pad, row_y + 4))
-        text_x = pad + av_size + 16 * SCALE
-    draw.text((text_x, row_y + 6 * SCALE), text["byline"], font=faces["inter"], fill=MUTED)
-    draw.text((text_x, row_y + 38 * SCALE), text["kicker"], font=faces["inter_bold"], fill=INK)
+        canvas.alpha_composite(av, (pad, int(round(row_top))))
+        text_x = pad + av_size + 14 * SCALE
+    draw.text((text_x, row_cy), text["byline"], font=faces["inter"], fill=(210, 210, 210, 255), anchor="lm")
+
+    year_bottom = row_top - 20 * SCALE
+    draw.text((pad, year_bottom), headline, font=face, fill=INK, anchor="ls")
     return canvas
 
 
@@ -504,7 +497,7 @@ def main() -> None:
                 card = compose(mosaic_cache[cache_id], avatar, faces, text)
                 rel = f"og/{lang}-{year_key}-{kind}.jpg"
                 save_card(card, PUBLIC / rel)
-                image = f"{site}/{rel}" if site else rel
+                image = f"{site}/{rel}?v={CACHE_BUST}" if site else rel
                 key = f"{lang}|{year_key}|{kind}"
                 pages[key] = {
                     "title": text["title"],
