@@ -1669,7 +1669,8 @@ footer a { color: var(--yellow); }
   .activity-bar {
     transform-origin: bottom center;
   }
-  .bar-track i {
+  .bar-track i,
+  .theme-bar {
     transform-origin: left center;
   }
 
@@ -1678,7 +1679,8 @@ footer a { color: var(--yellow); }
     animation: grow-y 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
     animation-delay: calc(var(--i, 0) * 55ms);
   }
-  .is-in .bar-track i {
+  .is-in .bar-track i,
+  .is-in .theme-bar {
     animation: grow-x 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
     animation-delay: calc(var(--i, 0) * 50ms);
   }
@@ -1706,6 +1708,10 @@ footer a { color: var(--yellow); }
     transform-origin: center;
     pointer-events: none;
     animation: heat-star 0.95s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--star, 0s);
+  }
+  .is-in .world-frame path.has-data {
+    animation: map-light 0.95s cubic-bezier(0.16, 1, 0.3, 1) both;
     animation-delay: var(--star, 0s);
   }
 }
@@ -1744,6 +1750,20 @@ footer a { color: var(--yellow); }
     transform: scale(1);
     filter: brightness(1);
     box-shadow: 0 0 0 transparent;
+  }
+}
+@keyframes map-light {
+  0% {
+    opacity: 0;
+    filter: brightness(2.4);
+  }
+  42% {
+    opacity: 1;
+    filter: brightness(1.9);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
   }
 }
 

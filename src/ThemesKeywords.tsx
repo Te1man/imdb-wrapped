@@ -33,9 +33,9 @@ function ThemeCol({
   return (
     <div className="theme-col">
       <h3>{heading}</h3>
-      <ul className="theme-rows">
-        {rows.map((row) => (
-          <li key={row.id || row.name}>
+      <ul className="theme-rows" key={mode}>
+        {rows.map((row, i) => (
+          <li key={row.id || row.name} style={{ ["--i" as string]: i } as React.CSSProperties}>
             <i className="theme-bar" style={{ width: `${barWidth(row, mode, max)}%` }} />
             <span className={`theme-name${capitalize && lang !== "ru" ? " is-kw" : ""}`}>
               {tagName(row.name, lang)}

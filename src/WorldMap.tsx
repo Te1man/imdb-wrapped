@@ -24,6 +24,12 @@ function fillFor(count: number, max: number, hover: boolean) {
   return `rgb(${lerp(74, 245, u)}, ${lerp(58, 197, u)}, ${lerp(8, 24, u)})`;
 }
 
+function mapDelay(d: string) {
+  const m = /^M\s*([\d.]+)/.exec(d);
+  const x = m ? Number(m[1]) : 0;
+  return `${(x / 1000) * 0.7}s`;
+}
+
 export function WorldMapBlock({ countries }: { countries: NamedCount[] }) {
   const { t, lang } = useLocale();
   const frameRef = useRef<HTMLDivElement>(null);
@@ -162,8 +168,14 @@ export function WorldMapBlock({ countries }: { countries: NamedCount[] }) {
                   <path
                     key={c.id}
                     d={c.d}
+                    className={count > 0 ? "has-data" : undefined}
                     fill={fillFor(count, max, active)}
                     fillRule="evenodd"
+                    style={
+                      count > 0
+                        ? ({ ["--star" as string]: mapDelay(c.d) } as React.CSSProperties)
+                        : undefined
+                    }
                     onPointerEnter={(e) => enterCountry(c.id, c.name, e)}
                     onPointerLeave={() => setHover((h) => (h?.id === c.id ? null : h))}
                   />
