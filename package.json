@@ -1,0 +1,27 @@
+{
+  "name": "imdb-wrapped",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Personal IMDb Wrapped — fork, paste your profile URL, drop in your export CSVs.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "data": "python3 scripts/build_stats.py --fast && python3 scripts/fetch_watchlist.py",
+    "data:full": "python3 scripts/build_stats.py && python3 scripts/fetch_watchlist.py --live",
+    "watchlist": "python3 scripts/fetch_watchlist.py --live",
+    "fetch": "python3 scripts/fetch_ratings.py"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.3"
+  }
+}
