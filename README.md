@@ -1,5 +1,7 @@
 # IMDb Wrapped
 
+[![IMDb Wrapped](docs/preview.jpg)](https://telman.ru/imdb)
+
 A personal year-in-review from your public IMDb ratings — Letterboxd Wrapped energy, IMDb palette.
 
 Fork it, paste your profile URL, drop in your export CSVs, and you get the same page with your films, series, map, directors, watchlist, and the rest.
