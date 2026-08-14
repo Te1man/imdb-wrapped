@@ -30,11 +30,10 @@ CTX = ssl.create_default_context()
 W, H = 1200, 630
 SCALE = 2
 CW, CH = W * SCALE, H * SCALE
-CACHE_BUST = "2"
+CACHE_BUST = "3"
 
 YELLOW = (245, 197, 24, 255)
 INK = (245, 245, 245, 255)
-MUTED = (154, 154, 154, 255)
 BG = (12, 12, 12, 255)
 MARK_INK = (12, 12, 12, 255)
 
@@ -142,8 +141,20 @@ def load_image(url: str, posters: Path) -> Image.Image | None:
         return None
 
 
+def cover_resize(im: Image.Image, size: tuple[int, int]) -> Image.Image:
+    tw, th = size
+    iw, ih = im.size
+    scale = max(tw / max(iw, 1), th / max(ih, 1))
+    nw = max(tw, round(iw * scale))
+    nh = max(th, round(ih * scale))
+    im = im.convert("RGB").resize((nw, nh), Image.Resampling.LANCZOS)
+    left = max(0, (nw - tw) // 2)
+    top = max(0, (nh - th) // 2)
+    return im.crop((left, top, left + tw, top + th))
+
+
 def circle(im: Image.Image, size: int) -> Image.Image:
-    im = im.convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
+    im = cover_resize(im, (size, size)).convert("RGBA")
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -152,12 +163,11 @@ def circle(im: Image.Image, size: int) -> Image.Image:
 
 
 def round_poster(im: Image.Image, size: tuple[int, int], radius: int) -> Image.Image:
-    im = im.convert("RGB").resize(size, Image.Resampling.LANCZOS)
-    rgba = im.convert("RGBA")
+    im = cover_resize(im, size).convert("RGBA")
     mask = Image.new("L", size, 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, size[0] - 1, size[1] - 1), radius=radius, fill=255)
     out = Image.new("RGBA", size, (0, 0, 0, 0))
-    out.paste(rgba, (0, 0), mask)
+    out.paste(im, (0, 0), mask)
     return out
 
 
@@ -189,16 +199,32 @@ def shade(size: tuple[int, int]) -> Image.Image:
     pix = grad.load()
     for y in range(h):
         t = y / max(1, h - 1)
+        top = 0.62 * max(0.0, 1.0 - t / 0.30) ** 1.1
         if t < 0.38:
-            a = 0.28 + (0.42 - 0.28) * (t / 0.38)
+            bot = 0.22 + (0.42 - 0.22) * (t / 0.38)
         elif t < 0.68:
-            a = 0.42 + (0.82 - 0.42) * ((t - 0.38) / 0.30)
+            bot = 0.42 + (0.82 - 0.42) * ((t - 0.38) / 0.30)
         else:
-            a = 0.82 + (0.97 - 0.82) * ((t - 0.68) / 0.32)
-        pix[0, y] = int(255 * a)
+            bot = 0.82 + (0.97 - 0.82) * ((t - 0.68) / 0.32)
+        pix[0, y] = int(255 * max(top, bot))
     overlay = Image.new("RGBA", size, (12, 12, 12, 255))
     overlay.putalpha(grad.resize((w, h), Image.Resampling.BILINEAR))
     return overlay
+
+
+def draw_outlined_text(
+    base: Image.Image,
+    xy: tuple[float, float],
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    fill: tuple[int, int, int, int],
+    anchor: str = "lm",
+) -> None:
+    glow = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    ImageDraw.Draw(glow).text(xy, text, font=font, fill=(0, 0, 0, 255), anchor=anchor)
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=8))
+    base.alpha_composite(glow)
+    ImageDraw.Draw(base).text(xy, text, font=font, fill=fill, anchor=anchor)
 
 
 def text_size(draw: ImageDraw.ImageDraw, text: str, face: ImageFont.FreeTypeFont) -> tuple[int, int]:
@@ -363,13 +389,8 @@ def compose(base: Image.Image, avatar: Image.Image | None, faces: dict, text: di
     pad = 64 * SCALE
     brand_cy = 56 * SCALE
     mark_w, mark_h = draw_imdb_mark(canvas, pad, brand_cy, faces["mark"])
-    draw.text(
-        (pad + mark_w + 16 * SCALE, brand_cy),
-        "Wrapped",
-        font=faces["wrapped"],
-        fill=MUTED,
-        anchor="lm",
-    )
+    wrapped_x = pad + mark_w + 16 * SCALE
+    draw_outlined_text(canvas, (wrapped_x, brand_cy), "Wrapped", faces["wrapped"], INK, "lm")
     draw_kind_switch(canvas, text["lang"], text["kind"], faces["pill"], brand_cy)
 
     headline = text["headline"]
@@ -473,7 +494,7 @@ def main() -> None:
         "all_ru": font(fonts["InterVariable.ttf"], 72 * SCALE, 800),
         "inter": font(fonts["InterVariable.ttf"], 22 * SCALE, 500),
         "inter_bold": font(fonts["InterVariable.ttf"], 22 * SCALE, 650),
-        "wrapped": font(fonts["InterVariable.ttf"], 28 * SCALE, 600),
+        "wrapped": font(fonts["InterVariable.ttf"], 30 * SCALE, 700),
         "mark": font(fonts["InterVariable.ttf"], 26 * SCALE, 800),
         "pill": font(fonts["InterVariable.ttf"], 15 * SCALE, 650),
         "touch": font(fonts["InterVariable.ttf"], 110, 800),
