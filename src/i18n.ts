@@ -447,6 +447,24 @@ export function formatUpdatedAt(iso: string | null | undefined, lang: Lang): str
   return `${dd}.${mm}.${yyyy} (${hh}:${min})`;
 }
 
+/** Freshest stamp across stats rebuild and watchlist sync. */
+export function latestUpdatedAt(
+  ...stamps: Array<string | null | undefined>
+): string | undefined {
+  let best: string | undefined;
+  let bestMs = -1;
+  for (const stamp of stamps) {
+    if (!stamp) continue;
+    const ms = Date.parse(stamp);
+    if (Number.isNaN(ms)) continue;
+    if (ms >= bestMs) {
+      bestMs = ms;
+      best = stamp;
+    }
+  }
+  return best;
+}
+
 export type Copy = {
   allTime: string;
   toDate: (when: string) => string;

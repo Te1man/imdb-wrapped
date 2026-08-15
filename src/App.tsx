@@ -25,6 +25,7 @@ import {
   formatDateLong,
   formatDateShort,
   formatUpdatedAt,
+  latestUpdatedAt,
   genreName,
   mediaPoster,
   mediaTitle,
@@ -1240,9 +1241,9 @@ function YearSelect({
   onChange: (y: string) => void;
 }) {
   const { t, lang } = useLocale();
-  const { wrapped } = useData();
+  const { wrapped, watchlist } = useData();
   const currentYear = new Date().getFullYear();
-  const asOf = formatUpdatedAt(wrapped.generatedAt, lang);
+  const asOf = formatUpdatedAt(latestUpdatedAt(wrapped.generatedAt, watchlist.updatedAt), lang);
   const label = value === "all" ? t.allTime : value;
   return (
     <label className={`year-select${value === "all" ? " is-all" : ""}`}>
@@ -1647,7 +1648,15 @@ export default function App() {
             <div className="hero-byline-row">
               <a className="hero-byline" href={wrapped.profile.url} target="_blank" rel="noreferrer">
                 <img src={wrapped.profile.avatar} alt="" />
-                <span>{yearByline(year, stats.toDate, kind, t, formatUpdatedAt(wrapped.generatedAt, lang))}</span>
+                <span>
+                  {yearByline(
+                    year,
+                    stats.toDate,
+                    kind,
+                    t,
+                    formatUpdatedAt(latestUpdatedAt(wrapped.generatedAt, watchlist.updatedAt), lang),
+                  )}
+                </span>
               </a>
               <ShareButton year={year} />
             </div>

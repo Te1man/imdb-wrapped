@@ -456,6 +456,18 @@ def main() -> int:
     public_data = ROOT / "public" / "data"
     public_data.mkdir(parents=True, exist_ok=True)
     (public_data / "watchlist.json").write_text(body)
+    # Keep the hero "as of" stamp in sync when only the watchlist refreshed.
+    for stats_path in (ROOT / "src" / "data" / "stats.json", public_data / "stats.json"):
+        if not stats_path.exists():
+            continue
+        try:
+            stats = json.loads(stats_path.read_text())
+            stats["generatedAt"] = datetime.now().astimezone().isoformat(timespec="seconds")
+            if isinstance(stats.get("profile"), dict):
+                stats["profile"]["watchlist"] = len(items)
+            stats_path.write_text(json.dumps(stats, ensure_ascii=False))
+        except Exception as exc:  # noqa: BLE001
+            print(f"stats stamp bump skipped: {exc}", flush=True)
     posters = sum(1 for it in items if it.get("poster"))
     print(f"Wrote {OUT} ({len(items)} titles, {posters} posters, source={source})", flush=True)
     return 0
