@@ -27,7 +27,14 @@ rsync -az --delete \
   --exclude deploy.env \
   --exclude 'public/og/*.jpg' \
   --exclude 'data/raw' \
+  --exclude 'data/cache' \
   "$ROOT/" "$HOST:$REMOTE_APP/"
+
+# Keep durable RU title/poster cache on the server across syncs.
+if [[ -f "$ROOT/data/cache/ru-locale.json" ]]; then
+  ssh "$HOST" "mkdir -p '$REMOTE_APP/data/cache'"
+  scp -q "$ROOT/data/cache/ru-locale.json" "$HOST:$REMOTE_APP/data/cache/ru-locale.json"
+fi
 
 # Keep server-side deploy.env so cron knows the docroot
 ssh "$HOST" "cat > '$REMOTE_APP/deploy.env' <<EOF

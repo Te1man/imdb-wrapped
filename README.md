@@ -57,6 +57,7 @@ npm run data         # rebuild from CSV, skip most live fetches
 npm run data:full    # GraphQL enrich from CSV
 npm run sync         # live ratings + watchlist + OG (for auto-refresh)
 npm run publish:data # sync then rsync JSON/OG to the server
+npm run deploy:imdb  # build UI and rsync dist/ without clobbering live data/
 npm run watchlist    # refresh watchlist.json
 npm run build        # production bundle
 ```
@@ -67,15 +68,17 @@ The site loads `data/stats.json` and `data/watchlist.json` at runtime. Keep the 
 
 Anyone forking this repo can run hourly updates on **their** VPS:
 
-1. Build and deploy the static site once (`npm run build` / `build:imdb`, rsync/`scp` the `dist/` folder).
-2. Copy deploy settings:
+1. Build and deploy the static site once:
 
 ```bash
 cp deploy.example.env deploy.env
 # edit IMDB_DEPLOY_HOST and IMDB_DOCROOT
+npm run deploy:imdb
 ```
 
-3. Push the sync pipeline to the server and install cron:
+`deploy:imdb` syncs the UI and **does not overwrite** `data/` on the server (cron owns live ratings/watchlist). Pass `--with-data` only when you intentionally want to push local JSON.
+
+2. Push the sync pipeline to the server and install cron:
 
 ```bash
 bash scripts/setup_vps_sync.sh
@@ -91,7 +94,7 @@ Manual refresh on the server:
 ssh "$IMDB_DEPLOY_HOST" "cd /opt/imdb-wrapped && ./scripts/publish_data.sh"
 ```
 
-After a UI code change, rebuild and redeploy `dist/`. New ratings / watchlist / lists are handled by the server cron alone.
+After a UI code change, run `npm run deploy:imdb` again. New ratings / watchlist / lists stay on the server cron — avoid `rsync --delete dist/` that includes `data/`, or a stale laptop snapshot can wipe a fresher sync.
 
 ## Contributing
 

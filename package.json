@@ -16,6 +16,7 @@
     "data:full": "python3 scripts/build_stats.py && python3 scripts/fetch_watchlist.py --live && python3 scripts/build_og.py && npm run copy-data",
     "sync": "python3 scripts/sync_live.py",
     "publish:data": "bash scripts/publish_data.sh",
+    "deploy:imdb": "bash scripts/deploy_site.sh",
     "setup:vps": "bash scripts/setup_vps_sync.sh",
     "watchlist": "python3 scripts/fetch_watchlist.py --live",
     "fetch": "python3 scripts/fetch_ratings.py"
