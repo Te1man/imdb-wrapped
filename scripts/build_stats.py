@@ -1712,6 +1712,21 @@ def compact_title(item: dict) -> dict:
     return out
 
 
+def compact_monthly_poster(item: dict) -> dict:
+    """Slim title card for the activity-chart poster stack."""
+    out = {
+        "id": item.get("id"),
+        "title": item.get("title") or "",
+        "poster": item.get("poster"),
+        "url": f"https://www.imdb.com/title/{item['id']}/" if item.get("id") else item.get("url"),
+    }
+    if item.get("titleRu"):
+        out["titleRu"] = item["titleRu"]
+    if item.get("posterRu"):
+        out["posterRu"] = item["posterRu"]
+    return out
+
+
 def top_n(items: list[dict], key, reverse=True, n=10, require=None) -> list[dict]:
     getter = key if callable(key) else lambda it, k=key: it.get(k)
     pool = [it for it in items if getter(it) is not None]
@@ -1904,12 +1919,15 @@ def stats_for(
         years = sorted({it["ratedYear"] for it in items})
         months_span = max(1, (years[-1] - years[0] + 1) * 12)
     monthly = [0] * 12
-    monthly_posters: list[list[str]] = [[] for _ in range(12)]
+    monthly_posters: list[list[dict]] = [[] for _ in range(12)]
     for it in items:
         m = it["ratedMonth"] - 1
         monthly[m] += 1
+        # items are newest-first; keep up to 8 most recent, then reverse so
+        # DOM order is oldest→newest (activity-stack is column-reverse: bottom→top).
         if it.get("poster") and len(monthly_posters[m]) < 8:
-            monthly_posters[m].append(it["poster"])
+            monthly_posters[m].append(compact_monthly_poster(it))
+    monthly_posters = [list(reversed(col)) for col in monthly_posters]
     type_counts = Counter(it.get("typeId") or TYPE_TO_ID.get(it.get("type") or "", "other") for it in items)
     premieres = sum(1 for it in items if it.get("releaseYear") == (year or it.get("ratedYear")))
     if year is None:
@@ -2190,7 +2208,7 @@ def build(items: list[dict]) -> dict:
             "displayName": names,
             "telegram": telegram_url(CFG),
         },
-        "generatedAt": datetime.now().isoformat(timespec="seconds"),
+        "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
         "years": years,
         "defaultYear": years[0] if years else YEAR,
         "allTime": stats_bundle(items, None),

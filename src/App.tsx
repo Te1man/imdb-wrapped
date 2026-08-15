@@ -1,5 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { CatalogKind, HighsAndLows, TitleCard, WatchlistData, WatchlistItem, WrappedData, YearStats } from "./types";
+import type {
+  ActivityPoster,
+  CatalogKind,
+  HighsAndLows,
+  TitleCard,
+  WatchlistData,
+  WatchlistItem,
+  WrappedData,
+  YearStats,
+} from "./types";
 import { FALLBACK_STATS, useData } from "./DataContext";
 import { WorldMapBlock } from "./WorldMap";
 import { ThemesKeywords } from "./ThemesKeywords";
@@ -15,6 +24,7 @@ import {
   formatDate,
   formatDateLong,
   formatDateShort,
+  formatUpdatedAt,
   genreName,
   mediaPoster,
   mediaTitle,
@@ -86,16 +96,22 @@ function telegramLink(url?: string | null) {
   );
 }
 
-function yearByline(year: string, toDate: boolean, kind: CatalogKind, t: Copy) {
+function yearByline(
+  year: string,
+  toDate: boolean,
+  kind: CatalogKind,
+  t: Copy,
+  updatedAt: string,
+) {
   if (year === "all") {
     if (kind === "movies") return t.yearAllTimeMovies;
     if (kind === "series") return t.yearAllTimeSeries;
     return t.yearAllTime;
   }
   if (toDate) {
-    if (kind === "movies") return t.yearToDateMovies;
-    if (kind === "series") return t.yearToDateSeries;
-    return t.yearToDate;
+    if (kind === "movies") return t.yearToDateMovies(updatedAt);
+    if (kind === "series") return t.yearToDateSeries(updatedAt);
+    return t.yearToDate(updatedAt);
   }
   if (kind === "movies") return t.yearInMovies;
   if (kind === "series") return t.yearInSeries;
@@ -257,6 +273,62 @@ function WeekdayChart({ daily, kind }: { daily: Record<string, number>; kind: Ca
 
 function titleHref(t: TitleCard, profileUrl?: string) {
   return t.url || (t.id ? `https://www.imdb.com/title/${t.id}/` : profileUrl || FALLBACK_STATS.profile.url);
+}
+
+function normalizeActivityPoster(p: ActivityPoster): {
+  id?: string | null;
+  title: string;
+  titleRu?: string | null;
+  poster?: string | null;
+  posterRu?: string | null;
+  url?: string | null;
+} {
+  if (typeof p === "string") return { title: "", poster: p };
+  return {
+    id: p.id,
+    title: p.title || "",
+    titleRu: p.titleRu,
+    poster: p.poster,
+    posterRu: p.posterRu,
+    url: p.url,
+  };
+}
+
+function activityPosterSrc(p: ActivityPoster): string | null {
+  const n = normalizeActivityPoster(p);
+  return n.poster || n.posterRu || null;
+}
+
+function ActivityStackPosters({ posters }: { posters: ActivityPoster[] }) {
+  const { lang } = useLocale();
+  return (
+    <>
+      {posters.slice(0, 6).map((raw, k) => {
+        const p = normalizeActivityPoster(raw);
+        const src = mediaPoster(p, lang) || p.poster || p.posterRu;
+        if (!src) return null;
+        const title = mediaTitle(p, lang);
+        const href = p.url || (p.id ? `https://www.imdb.com/title/${p.id}/` : undefined);
+        const img = <img src={src} alt={title || ""} loading="lazy" />;
+        return href ? (
+          <a
+            key={`${p.id || src}-${k}`}
+            className="activity-poster"
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            title={title || undefined}
+          >
+            {img}
+          </a>
+        ) : (
+          <span key={`${src}-${k}`} className="activity-poster is-static">
+            {img}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 function useRevealOnScroll(resetKey: string) {
@@ -1044,9 +1116,7 @@ function ActivityBlock({
             {stats.monthly.map((n, i) => (
               <div key={months[i]} className="activity-col" title={`${months[i]}: ${n}`}>
                 <div className="activity-stack">
-                  {stats.monthlyPosters[i]?.slice(0, 6).map((p, k) => (
-                    <img key={p + k} src={p} alt="" />
-                  ))}
+                  <ActivityStackPosters posters={stats.monthlyPosters[i] || []} />
                   <div
                     className="activity-bar"
                     style={
@@ -1075,7 +1145,10 @@ function ActivityBlock({
 
 function yearPosters(stats: YearStats | undefined): string[] {
   if (!stats) return [];
-  const fromMonths = stats.monthlyPosters.flat().filter(Boolean);
+  const fromMonths = stats.monthlyPosters
+    .flat()
+    .map(activityPosterSrc)
+    .filter((p): p is string => Boolean(p));
   if (fromMonths.length) return fromMonths.slice(0, 6);
   return (stats.heroPosters || []).slice(0, 6);
 }
@@ -1127,7 +1200,9 @@ function YearlyActivityBlock({
           >
             <div className="activity-stack">
               {r.posters.map((p, k) => (
-                <img key={p + k} src={p} alt="" />
+                <span key={p + k} className="activity-poster is-static">
+                  <img src={p} alt="" loading="lazy" />
+                </span>
               ))}
               <div
                 className="activity-bar"
@@ -1162,8 +1237,10 @@ function YearSelect({
   years: number[];
   onChange: (y: string) => void;
 }) {
-  const { t } = useLocale();
+  const { t, lang } = useLocale();
+  const { wrapped } = useData();
   const currentYear = new Date().getFullYear();
+  const asOf = formatUpdatedAt(wrapped.generatedAt, lang);
   const label = value === "all" ? t.allTime : value;
   return (
     <label className={`year-select${value === "all" ? " is-all" : ""}`}>
@@ -1181,7 +1258,7 @@ function YearSelect({
       >
         {years.map((y) => (
           <option key={y} value={String(y)}>
-            {y === currentYear ? `${y} ${t.toDate}` : String(y)}
+            {y === currentYear ? `${y} ${t.toDate(asOf)}` : String(y)}
           </option>
         ))}
         <option value="all">{t.allTime}</option>
@@ -1568,25 +1645,10 @@ export default function App() {
             <div className="hero-byline-row">
               <a className="hero-byline" href={wrapped.profile.url} target="_blank" rel="noreferrer">
                 <img src={wrapped.profile.avatar} alt="" />
-                <span>{yearByline(year, stats.toDate, kind, t)}</span>
+                <span>{yearByline(year, stats.toDate, kind, t, formatUpdatedAt(wrapped.generatedAt, lang))}</span>
               </a>
               <ShareButton year={year} />
             </div>
-            <p className="hero-kicker">
-              <CountUp value={stats.count} /> {t.heroRated("0", stats.count).replace(/^0\s*/, "")}
-              {stats.hours ? (
-                <>
-                  {" · "}
-                  <CountUp
-                    value={stats.hours >= 100 ? Math.round(stats.hours) : stats.hours}
-                    digits={stats.hours >= 100 || Number.isInteger(stats.hours) ? 0 : 1}
-                  />{" "}
-                  {t.heroHours("0", stats.hours).replace(/^0\s*/, "")}
-                </>
-              ) : (
-                ""
-              )}
-            </p>
           </div>
         </div>
       </section>

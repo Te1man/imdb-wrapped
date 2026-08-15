@@ -18,6 +18,18 @@ export type TitleCard = {
   url?: string | null;
 };
 
+/** Poster tile in the monthly activity chart (legacy string URL still accepted). */
+export type ActivityPoster =
+  | string
+  | {
+      id?: string | null;
+      title?: string;
+      titleRu?: string | null;
+      poster?: string | null;
+      posterRu?: string | null;
+      url?: string | null;
+    };
+
 export type PersonStat = {
   name: string;
   id?: string | null;
@@ -58,7 +70,7 @@ export type YearStats = {
   avgPerWeek: number;
   avgRating: number | null;
   monthly: number[];
-  monthlyPosters: string[][];
+  monthlyPosters: ActivityPoster[][];
   daily: Record<string, number>;
   types: Record<string, number>;
   premieres: number;

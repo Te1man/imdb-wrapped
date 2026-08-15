@@ -435,13 +435,25 @@ export function decadeName(name: string, lang: Lang) {
   return name.replace(/s$/, "е");
 }
 
+export function formatUpdatedAt(iso: string | null | undefined, lang: Lang): string {
+  if (!iso) return lang === "ru" ? "сегодня" : "today";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return lang === "ru" ? "сегодня" : "today";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}.${mm}.${yyyy} (${hh}:${min})`;
+}
+
 export type Copy = {
   allTime: string;
-  toDate: string;
+  toDate: (when: string) => string;
   displayName: string;
-  yearToDate: string;
-  yearToDateMovies: string;
-  yearToDateSeries: string;
+  yearToDate: (when: string) => string;
+  yearToDateMovies: (when: string) => string;
+  yearToDateSeries: (when: string) => string;
   yearInFilm: string;
   yearInMovies: string;
   yearInSeries: string;
@@ -479,8 +491,6 @@ export type Copy = {
   avgRuntime: (hours: number, minutes: number) => string;
   avgHint1: string;
   avgHint2: (formatted: string, n: number, year?: string) => string;
-  heroRated: (formatted: string, n: number) => string;
-  heroHours: (formatted: string, hours: number) => string;
   newThisYear: string;
   premieres: (count: number, year: number | null) => string;
   olderTitles: (n: number) => string;
@@ -569,11 +579,11 @@ export type Copy = {
 export const copy: Record<Lang, Copy> = {
   en: {
     allTime: "All time",
-    toDate: "to date",
+    toDate: (when) => `as of ${when}`,
     displayName: "User",
-    yearToDate: "User’s year to date",
-    yearToDateMovies: "User’s year in movies to date",
-    yearToDateSeries: "User’s year in series to date",
+    yearToDate: (when) => `User’s year as of ${when}`,
+    yearToDateMovies: (when) => `User’s year in movies as of ${when}`,
+    yearToDateSeries: (when) => `User’s year in series as of ${when}`,
     yearInFilm: "User’s year in film",
     yearInMovies: "User’s year in movies",
     yearInSeries: "User’s year in series",
@@ -616,8 +626,6 @@ export const copy: Record<Lang, Copy> = {
       year
         ? `${formatted} ${enPlural(n, "rating", "ratings")} in ${year}`
         : `${formatted} ${enPlural(n, "rating", "ratings")} all-time`,
-    heroRated: (formatted, n) => `${formatted} ${enPlural(n, "title rated", "titles rated")}`,
-    heroHours: (h, n) => `${h} ${enPlural(Math.round(n), "hour", "hours")}`,
     newThisYear: "new this year",
     premieres: (count, year) =>
       year ? `${enPlural(count, "premiere", "premieres")} ${year}` : "Rated the year they came out",
@@ -725,11 +733,11 @@ export const copy: Record<Lang, Copy> = {
   },
   ru: {
     allTime: "За всё время",
-    toDate: "на сегодня",
+    toDate: (when) => `на ${when}`,
     displayName: "Пользователь",
-    yearToDate: "год пользователя на сегодня",
-    yearToDateMovies: "год пользователя в фильмах на сегодня",
-    yearToDateSeries: "год пользователя в сериалах на сегодня",
+    yearToDate: (when) => `год пользователя на ${when}`,
+    yearToDateMovies: (when) => `год пользователя в фильмах на ${when}`,
+    yearToDateSeries: (when) => `год пользователя в сериалах на ${when}`,
     yearInFilm: "год пользователя в кино",
     yearInMovies: "год пользователя в фильмах",
     yearInSeries: "год пользователя в сериалах",
@@ -772,9 +780,6 @@ export const copy: Record<Lang, Copy> = {
       year
         ? `${formatted} ${pluralRu(n, "оценка", "оценки", "оценок")} в ${year}`
         : `${formatted} ${pluralRu(n, "оценка", "оценки", "оценок")} за всё время`,
-    heroRated: (formatted, n) => `${formatted} ${pluralRu(n, "оценка", "оценки", "оценок")}`,
-    heroHours: (h, n) =>
-      `${h} ${n < 100 && !Number.isInteger(n) ? "часов" : pluralRu(Math.round(n), "час", "часа", "часов")}`,
     newThisYear: "новинки",
     premieres: (count, year) =>
       year
@@ -891,9 +896,9 @@ export function namedCopy(lang: Lang, names: DisplayNames): Copy {
     return {
       ...base,
       displayName: names.en,
-      yearToDate: `${poss} year to date`,
-      yearToDateMovies: `${poss} year in movies to date`,
-      yearToDateSeries: `${poss} year in series to date`,
+      yearToDate: (when) => `${poss} year as of ${when}`,
+      yearToDateMovies: (when) => `${poss} year in movies as of ${when}`,
+      yearToDateSeries: (when) => `${poss} year in series as of ${when}`,
       yearInFilm: `${poss} year in film`,
       yearInMovies: `${poss} year in movies`,
       yearInSeries: `${poss} year in series`,
@@ -907,9 +912,9 @@ export function namedCopy(lang: Lang, names: DisplayNames): Copy {
   return {
     ...base,
     displayName: ru,
-    yearToDate: `год ${gen} на сегодня`,
-    yearToDateMovies: `год ${gen} в фильмах на сегодня`,
-    yearToDateSeries: `год ${gen} в сериалах на сегодня`,
+    yearToDate: (when) => `год ${gen} на ${when}`,
+    yearToDateMovies: (when) => `год ${gen} в фильмах на ${when}`,
+    yearToDateSeries: (when) => `год ${gen} в сериалах на ${when}`,
     yearInFilm: `год ${gen} в кино`,
     yearInMovies: `год ${gen} в фильмах`,
     yearInSeries: `год ${gen} в сериалах`,
