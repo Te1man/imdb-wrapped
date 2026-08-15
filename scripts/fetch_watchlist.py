@@ -417,7 +417,7 @@ def payload(items: list[dict], source: str) -> dict:
     return {
         "source": source,
         "url": WATCHLIST_URL,
-        "updatedAt": datetime.now().isoformat(timespec="seconds"),
+        "updatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
         "count": len(items),
         "addedYears": years,
         "items": items,
