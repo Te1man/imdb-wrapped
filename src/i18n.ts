@@ -569,6 +569,10 @@ export type Copy = {
   favoriteTitles: string;
   favoritePeople: string;
   footerCredit: string;
+  footerOpenBefore: string;
+  footerOpenLink: string;
+  footerOpenAfter: string;
+  footerContact: string;
   heatTitle: (date: string, n: number) => string;
   language: string;
   share: string;
@@ -724,6 +728,10 @@ export const copy: Record<Lang, Copy> = {
     favoriteTitles: "Favorite titles",
     favoritePeople: "Favorite people",
     footerCredit: "Built from public IMDb ratings for ",
+    footerOpenBefore: "The code is open, ",
+    footerOpenLink: "you can view it",
+    footerOpenAfter: " and make your own",
+    footerContact: "Contact:",
     heatTitle: (date, n) => `${date}: ${n} ${n === 1 ? "title" : "titles"}`,
     language: "Language",
     share: "Share",
@@ -873,6 +881,10 @@ export const copy: Record<Lang, Copy> = {
     favoriteTitles: "Любимые картины",
     favoritePeople: "Любимые персоны",
     footerCredit: "Собрано по публичным оценкам IMDb пользователя ",
+    footerOpenBefore: "Код открытый, ",
+    footerOpenLink: "можно посмотреть",
+    footerOpenAfter: " и сделать свой",
+    footerContact: "Контакт:",
     heatTitle: (date, n) =>
       `${date}: ${n} ${pluralRu(n, "картина", "картины", "картин")}`,
     language: "Язык",

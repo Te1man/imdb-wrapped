@@ -67,6 +67,43 @@ query($ids: [ID!]!) {
 }
 """
 
+PROFILE_QUERY = """
+query($id: ID!) {
+  userProfile(input: {profileId: $id}) {
+    userId
+  }
+}
+"""
+
+WATCHLIST_QUERY = """
+query($userId: ID, $after: ID) {
+  predefinedList(classType: WATCH_LIST, userId: $userId) {
+    items(first: 100, after: $after, sort: {by: CREATED_DATE, order: DESC}) {
+      total
+      pageInfo { endCursor hasNextPage }
+      edges {
+        node {
+          createdDate
+          item {
+            ... on Title {
+              id
+              titleText { text }
+              titleType { id }
+              releaseYear { year }
+              runtime { seconds }
+              ratingsSummary { aggregateRating voteCount }
+              genres { genres { text } }
+              primaryImage { url }
+              countriesOfOrigin { countries { id text } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
 
 def poster_thumb(url: str | None, width: int = 320) -> str | None:
     if not url:
@@ -164,6 +201,93 @@ def parse_csv(path: Path) -> list[dict]:
     return items
 
 
+def resolve_user_id() -> str | None:
+    if _IDS.get("userConst"):
+        return _IDS["userConst"]
+    cache_path = CACHE / "identity.json"
+    if cache_path.exists():
+        try:
+            cached = json.loads(cache_path.read_text())
+            if isinstance(cached, dict) and cached.get("userId"):
+                return str(cached["userId"])
+        except Exception:  # noqa: BLE001
+            pass
+    profile_id = _IDS.get("profileId")
+    if not profile_id:
+        return None
+    try:
+        data = gql(PROFILE_QUERY, {"id": profile_id})
+        uid = ((data.get("data") or {}).get("userProfile") or {}).get("userId")
+        return str(uid) if uid else None
+    except Exception as exc:  # noqa: BLE001
+        print(f"watchlist userId fail: {exc}", flush=True)
+        return None
+
+
+def live_watchlist() -> list[dict]:
+    """Pull the public watchlist via GraphQL (HTML scrape is blocked by WAF)."""
+    user_id = resolve_user_id()
+    if not user_id:
+        raise RuntimeError("Could not resolve IMDb userId for watchlist")
+    out: list[dict] = []
+    after = None
+    total = None
+    page = 0
+    while True:
+        data = gql(WATCHLIST_QUERY, {"userId": user_id, "after": after})
+        conn = (((data.get("data") or {}).get("predefinedList") or {}).get("items") or {})
+        if total is None:
+            total = int(conn.get("total") or 0)
+            print(f"GraphQL watchlist total {total}", flush=True)
+        for edge in conn.get("edges") or []:
+            node = edge.get("node") or {}
+            title = node.get("item") or {}
+            tid = title.get("id")
+            if not tid:
+                continue
+            created = (node.get("createdDate") or "")[:10] or None
+            runtime = (title.get("runtime") or {}).get("seconds")
+            rs = title.get("ratingsSummary") or {}
+            genres = [
+                g["text"]
+                for g in ((title.get("genres") or {}).get("genres") or [])
+                if g.get("text")
+            ]
+            countries = [
+                {"id": c.get("id"), "name": c.get("text")}
+                for c in ((title.get("countriesOfOrigin") or {}).get("countries") or [])
+                if c.get("text")
+            ]
+            out.append(
+                {
+                    "id": tid,
+                    "title": ((title.get("titleText") or {}).get("text") or tid).strip(),
+                    "year": (title.get("releaseYear") or {}).get("year"),
+                    "type": (title.get("titleType") or {}).get("id") or "movie",
+                    "runtimeMin": int(runtime / 60) if runtime else None,
+                    "imdbRating": rs.get("aggregateRating"),
+                    "votes": rs.get("voteCount"),
+                    "addedOn": created,
+                    "genres": genres,
+                    "directors": [],
+                    "url": f"https://www.imdb.com/title/{tid}/",
+                    "poster": poster_thumb((title.get("primaryImage") or {}).get("url")),
+                    "countries": countries,
+                    "liveNew": True,
+                }
+            )
+        page += 1
+        print(f"  watchlist page {page}: {len(out)}/{total or '?'}", flush=True)
+        page_info = conn.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        after = page_info.get("endCursor")
+        if not after:
+            break
+        time.sleep(0.08)
+    return out
+
+
 def jina_fetch(url: str, timeout: int = 70) -> str:
     cmd = [
         "curl", "-sS", "--max-time", str(timeout),
@@ -177,8 +301,8 @@ def jina_fetch(url: str, timeout: int = 70) -> str:
     return proc.stdout
 
 
-def live_ids() -> list[str]:
-    """Pull current watchlist title IDs from the public IMDb page."""
+def live_ids_html() -> list[str]:
+    """Legacy HTML scrape via jina — kept as a last-resort fallback."""
     RAW.mkdir(parents=True, exist_ok=True)
     found: list[str] = []
     seen: set[str] = set()
@@ -255,41 +379,36 @@ def enrich(items: list[dict]) -> list[dict]:
     return items
 
 
-def merge_live(csv_items: list[dict], live: list[str]) -> list[dict]:
+def merge_live(csv_items: list[dict], live_items: list[dict]) -> list[dict]:
     by_id = {it["id"]: it for it in csv_items}
-    if len(live) < 100:
-        print("live scrape too small, keeping CSV order", flush=True)
+    if len(live_items) < 20:
+        print("live watchlist too small, keeping CSV order", flush=True)
         return csv_items
     merged = []
-    seen = set()
-    for tid in live:
+    seen: set[str] = set()
+    for live in live_items:
+        tid = live.get("id")
+        if not tid or tid in seen:
+            continue
         seen.add(tid)
         if tid in by_id:
-            merged.append(by_id[tid])
+            item = dict(by_id[tid])
+            if live.get("addedOn"):
+                item["addedOn"] = live["addedOn"]
+            # Prefer live poster/meta when CSV row is sparse.
+            for key in ("poster", "year", "type", "imdbRating", "votes", "runtimeMin", "genres", "countries"):
+                if live.get(key) not in (None, [], "") and not item.get(key):
+                    item[key] = live[key]
+            merged.append(item)
         else:
-            merged.append(
-                {
-                    "id": tid,
-                    "title": tid,
-                    "originalTitle": None,
-                    "year": None,
-                    "type": "movie",
-                    "runtimeMin": None,
-                    "imdbRating": None,
-                    "votes": None,
-                    "addedOn": None,
-                    "genres": [],
-                    "directors": [],
-                    "url": f"https://www.imdb.com/title/{tid}/",
-                    "poster": None,
-                    "releaseDate": None,
-                    "liveNew": True,
-                }
-            )
-    for it in csv_items:
-        if it["id"] not in seen:
-            merged.append(it)
-    print(f"merged live {len(live)} + csv leftover {len(merged) - len(live)} = {len(merged)}", flush=True)
+            merged.append(live)
+    leftover = [it for it in csv_items if it["id"] not in seen]
+    if leftover:
+        merged.extend(leftover)
+    print(
+        f"merged live {len(live_items)} + csv leftover {len(leftover)} = {len(merged)}",
+        flush=True,
+    )
     return merged
 
 
@@ -315,10 +434,19 @@ def main() -> int:
     print(f"CSV watchlist: {len(items)} titles", flush=True)
     if live:
         try:
-            ids = live_ids()
-            if ids:
-                items = merge_live(items, ids)
-                source = "imdb+csv" if len(ids) >= 20 else "csv"
+            live_items = live_watchlist()
+            if live_items:
+                items = merge_live(items, live_items)
+                source = "imdb+csv"
+            else:
+                # Last resort: blocked HTML scrape (usually returns 0 now).
+                ids = live_ids_html()
+                if ids:
+                    items = merge_live(
+                        items,
+                        [{"id": tid, "title": tid, "url": f"https://www.imdb.com/title/{tid}/"} for tid in ids],
+                    )
+                    source = "imdb+csv" if len(ids) >= 20 else "csv"
         except Exception as exc:  # noqa: BLE001
             print(f"live fetch skipped: {exc}", flush=True)
     items = enrich(items)

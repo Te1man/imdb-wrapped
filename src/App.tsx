@@ -96,6 +96,8 @@ function telegramLink(url?: string | null) {
   );
 }
 
+const REPO_URL = "https://github.com/Te1man/imdb-wrapped";
+
 function yearByline(
   year: string,
   toDate: boolean,
@@ -2030,10 +2032,16 @@ export default function App() {
 
       <footer>
         <div className="footer-row">
-          <p className="footer-brand">
+          <a
+            className="footer-brand"
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="GitHub"
+          >
             <span className="imdb-mark">IMDb</span>
             <span className="brand-rest">{t.wrapped}</span>
-          </p>
+          </a>
           <div className="lang-switch" role="group" aria-label={t.language}>
             <button
               type="button"
@@ -2061,7 +2069,18 @@ export default function App() {
               {t.displayName}
             </a>
           </span>
-          {telegramLink(wrapped.profile.telegram)}
+          <span>
+            {t.footerOpenBefore}
+            <a href={REPO_URL} target="_blank" rel="noreferrer">
+              {t.footerOpenLink}
+            </a>
+            {t.footerOpenAfter}
+          </span>
+          {wrapped.profile.telegram ? (
+            <span>
+              {t.footerContact} {telegramLink(wrapped.profile.telegram)}
+            </span>
+          ) : null}
         </p>
       </footer>
     </div>
