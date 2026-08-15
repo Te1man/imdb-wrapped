@@ -77,36 +77,31 @@ export function formatKindCount(
   return `${formatted} ${noun}`;
 }
 
-export function formatDate(iso: string | null | undefined, lang: Lang) {
-  if (!iso) return "";
+export const MONTHS: Record<Lang, string[]> = {
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  ru: ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"],
+};
+
+function parseIsoDate(iso: string | null | undefined) {
+  if (!iso) return null;
   const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function formatDate(iso: string | null | undefined, lang: Lang) {
+  const d = parseIsoDate(iso);
+  if (!d) return iso || "";
+  return `${d.getDate()} ${MONTHS[lang][d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function formatDateLong(iso: string | null | undefined, lang: Lang) {
-  if (!iso) return "";
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDate(iso, lang);
 }
 
 export function formatDateShort(iso: string | null | undefined, lang: Lang) {
-  if (!iso) return "";
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US", {
-    day: "numeric",
-    month: "short",
-  });
+  const d = parseIsoDate(iso);
+  if (!d) return iso || "";
+  return `${d.getDate()} ${MONTHS[lang][d.getMonth()]}`;
 }
 
 export const WEEKDAYS: Record<Lang, string[]> = {
@@ -122,10 +117,6 @@ export const WEEKDAYS_FULL: Record<Lang, string[]> = {
 export const WEEKDAYS_WHEN: Record<Lang, string[]> = {
   en: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
   ru: ["в понедельник", "во вторник", "в среду", "в четверг", "в пятницу", "в субботу", "в воскресенье"],
-};
-export const MONTHS: Record<Lang, string[]> = {
-  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-  ru: ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"],
 };
 
 const TYPE: Record<Lang, Record<string, string>> = {
@@ -815,7 +806,7 @@ export const copy: Record<Lang, Copy> = {
     ratedHigher: "Оценка выше средней",
     ratedLower: "Оценка ниже средней",
     mostPopular: "Самые популярные",
-    mostPopularOne: "Самое популярное на IMDb",
+    mostPopularOne: "Популярное на IMDb",
     mostObscure: "Самые малоизвестные",
     newest: "Самые новые",
     oldest: "Самые старые",

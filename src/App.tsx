@@ -1165,68 +1165,30 @@ function YearSelect({
   onChange: (y: string) => void;
 }) {
   const { t } = useLocale();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
-  }, []);
+  const currentYear = new Date().getFullYear();
   const label = value === "all" ? t.allTime : value;
-  const toggle = () => setOpen((v) => !v);
-  const menu = open && (
-    <ul className="year-menu">
-      {years.map((y) => (
-        <li key={y}>
-          <button
-            type="button"
-            className={value === String(y) ? "on" : ""}
-            onClick={() => {
-              onChange(String(y));
-              setOpen(false);
-            }}
-          >
-            {y}
-            {y === new Date().getFullYear() ? ` ${t.toDate}` : ""}
-          </button>
-        </li>
-      ))}
-      <li className="year-menu-sep">
-        <button
-          type="button"
-          className={value === "all" ? "on" : ""}
-          onClick={() => {
-            onChange("all");
-            setOpen(false);
-          }}
-        >
-          {t.allTime}
-        </button>
-      </li>
-    </ul>
-  );
   return (
-    <div className={`year-select${value === "all" ? " is-all" : ""}`} ref={ref}>
-      <button type="button" className="year-btn" onClick={toggle} aria-expanded={open}>
-        <span className="year-btn-label">{label}</span>
-      </button>
-      <span className="year-caret-wrap">
-        <button
-          type="button"
-          className={`year-caret${open ? " open" : ""}`}
-          onClick={toggle}
-          aria-hidden="true"
-          tabIndex={-1}
-        >
-          <svg width="18" height="18" viewBox="0 0 20 20">
-            <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        </button>
-        {menu}
+    <label className={`year-select${value === "all" ? " is-all" : ""}`}>
+      <span className="year-btn-label">{label}</span>
+      <span className="year-caret" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 20 20">
+          <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
       </span>
-    </div>
+      <select
+        className="year-native"
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {years.map((y) => (
+          <option key={y} value={String(y)}>
+            {y === currentYear ? `${y} ${t.toDate}` : String(y)}
+          </option>
+        ))}
+        <option value="all">{t.allTime}</option>
+      </select>
+    </label>
   );
 }
 
