@@ -1121,49 +1121,99 @@ def fetch_ru_titles(ids: list[str]) -> dict[str, dict]:
     return out
 
 
+def _ru_locale_path() -> Path:
+    return CACHE / "ru-locale.json"
+
+
+def load_ru_locale_cache() -> dict[str, dict]:
+    path = _ru_locale_path()
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text())
+        return raw if isinstance(raw, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def save_ru_locale_cache(cache: dict[str, dict]) -> None:
+    CACHE.mkdir(parents=True, exist_ok=True)
+    _ru_locale_path().write_text(json.dumps(cache, ensure_ascii=False))
+
+
+def _ru_entry_from_title(t: dict) -> dict:
+    title_ru = ((t.get("titleText") or {}).get("text") or "").strip()
+    poster_ru = poster_thumb((t.get("primaryImage") or {}).get("url"))
+    entry: dict[str, str] = {}
+    if title_ru:
+        entry["titleRu"] = title_ru
+    if poster_ru:
+        entry["posterRu"] = poster_ru
+    return entry
+
+
+def _apply_ru_entry_to_item(it: dict, entry: dict, *, series: bool = False) -> None:
+    title_ru = (entry.get("titleRu") or "").strip()
+    poster_ru = entry.get("posterRu")
+    if series:
+        if title_ru and title_ru != it.get("series"):
+            it["seriesTitleRu"] = title_ru
+        if poster_ru and poster_ru != it.get("seriesPoster"):
+            it["seriesPosterRu"] = poster_ru
+        return
+    if title_ru and title_ru != it.get("title"):
+        it["titleRu"] = title_ru
+    if poster_ru and poster_ru != it.get("poster"):
+        it["posterRu"] = poster_ru
+
+
 def apply_ru_locale(items: list[dict], *, force: bool = False) -> None:
-    done_path = CACHE / "ru-locale-done.json"
-    done: set[str] = set()
-    if done_path.exists() and not force:
-        try:
-            raw = json.loads(done_path.read_text())
-            if isinstance(raw, list):
-                done = set(raw)
-        except Exception:  # noqa: BLE001
-            done = set()
-    ids = sorted({
+    """Fetch/cache RU title+poster variants and stamp them onto rating items.
+
+    Results live in data/cache/ru-locale.json so rebuilds keep RU fields even
+    when enriched.json was rewritten without them. The old ru-locale-done.json
+    only tracked "attempted" ids and dropped the actual payload — ignore it.
+    """
+    cache = load_ru_locale_cache()
+    wanted = sorted({
         tid
         for it in items
         for tid in (it.get("id"), it.get("seriesId"))
-        if tid and (force or tid not in done)
+        if tid
     })
-    if not ids:
-        return
-    print(f"GraphQL RU titles {len(ids)}...", flush=True)
-    local = fetch_ru_titles(ids)
+    missing = [tid for tid in wanted if force or tid not in cache]
+    if missing:
+        print(f"GraphQL RU titles {len(missing)} (cache {len(cache)})...", flush=True)
+        local = fetch_ru_titles(missing)
+        fetched = 0
+        for tid in missing:
+            t = local.get(tid)
+            if t:
+                cache[tid] = _ru_entry_from_title(t)
+                fetched += 1
+            elif tid not in cache:
+                # Remember empty so a transient miss can still be retried via force.
+                cache[tid] = {}
+        save_ru_locale_cache(cache)
+        print(f"  RU locale saved {fetched}/{len(missing)}", flush=True)
+        # Drop the obsolete done-marker so we never skip a real refill again.
+        done_path = CACHE / "ru-locale-done.json"
+        if done_path.exists():
+            done_path.unlink()
+
+    applied = 0
     for it in items:
         tid = it.get("id")
-        t = local.get(tid or "")
-        if t:
-            title_ru = ((t.get("titleText") or {}).get("text") or "").strip()
-            poster_ru = poster_thumb((t.get("primaryImage") or {}).get("url"))
-            if title_ru and title_ru != it.get("title"):
-                it["titleRu"] = title_ru
-            if poster_ru and poster_ru != it.get("poster"):
-                it["posterRu"] = poster_ru
+        if tid and tid in cache and cache[tid]:
+            before = (it.get("titleRu"), it.get("posterRu"))
+            _apply_ru_entry_to_item(it, cache[tid], series=False)
+            if (it.get("titleRu"), it.get("posterRu")) != before:
+                applied += 1
         sid = it.get("seriesId")
-        st = local.get(sid or "")
-        if not st:
-            continue
-        series_title_ru = ((st.get("titleText") or {}).get("text") or "").strip()
-        series_poster_ru = poster_thumb((st.get("primaryImage") or {}).get("url"))
-        if series_title_ru and series_title_ru != it.get("series"):
-            it["seriesTitleRu"] = series_title_ru
-        if series_poster_ru and series_poster_ru != it.get("seriesPoster"):
-            it["seriesPosterRu"] = series_poster_ru
-    done.update(ids)
-    CACHE.mkdir(parents=True, exist_ok=True)
-    done_path.write_text(json.dumps(sorted(done)))
+        if sid and sid in cache and cache[sid]:
+            _apply_ru_entry_to_item(it, cache[sid], series=True)
+    if applied:
+        print(f"  RU locale applied to {applied} titles", flush=True)
 
 
 def apply_ru_cards(cards: list[dict]) -> None:
@@ -1171,18 +1221,18 @@ def apply_ru_cards(cards: list[dict]) -> None:
     ids = sorted({tid for it in cards if (tid := it.get("id"))})
     if not ids:
         return
-    local = fetch_ru_titles(ids)
+    cache = load_ru_locale_cache()
+    missing = [tid for tid in ids if tid not in cache]
+    if missing:
+        local = fetch_ru_titles(missing)
+        for tid in missing:
+            t = local.get(tid)
+            cache[tid] = _ru_entry_from_title(t) if t else {}
+        save_ru_locale_cache(cache)
     for it in cards:
-        t = local.get(it.get("id") or "")
-        if not t:
-            continue
-        title_ru = ((t.get("titleText") or {}).get("text") or "").strip()
-        poster_ru = poster_thumb((t.get("primaryImage") or {}).get("url"))
-        if title_ru and title_ru != it.get("title"):
-            it["titleRu"] = title_ru
-        if poster_ru and poster_ru != it.get("poster"):
-            it["posterRu"] = poster_ru
-
+        entry = cache.get(it.get("id") or "")
+        if entry:
+            _apply_ru_entry_to_item(it, entry, series=False)
 
 def spoken_langs(title: dict) -> list[dict]:
     return [
@@ -2180,6 +2230,9 @@ def stats_bundle(items: list[dict], year: int | None) -> dict:
 
 
 def build(items: list[dict]) -> dict:
+    # Re-apply RU titles/posters from durable cache (or fetch gaps) before
+    # compacting cards — enriched.json alone is not enough after a rebuild.
+    apply_ru_locale(items)
     identity = hydrate_identity()
     favorites = list(identity.get("favorites") or [])
     if favorites:
