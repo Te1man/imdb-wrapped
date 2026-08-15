@@ -1,5 +1,24 @@
 export type Lang = "en" | "ru";
 
+export type LocalizedMedia = {
+  title?: string;
+  titleRu?: string | null;
+  name?: string;
+  nameRu?: string | null;
+  poster?: string | null;
+  posterRu?: string | null;
+};
+
+export function mediaTitle(item: LocalizedMedia, lang: Lang): string {
+  const en = item.title || item.name || "";
+  const ru = item.titleRu || item.nameRu;
+  return (lang === "ru" && ru) || en;
+}
+
+export function mediaPoster(item: LocalizedMedia, lang: Lang): string | null {
+  return ((lang === "ru" && item.posterRu) || item.poster) || null;
+}
+
 const STORAGE = "imdbw-lang";
 
 export function detectLang(): Lang {

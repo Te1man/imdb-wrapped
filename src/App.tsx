@@ -17,6 +17,8 @@ import {
   formatDateLong,
   formatDateShort,
   genreName,
+  mediaPoster,
+  mediaTitle,
   tagName,
   typeLabel,
   type Copy,
@@ -389,8 +391,8 @@ function PosterRow({
         {items.map((t) => (
           <Poster
             key={`${t.id}-${t.title}-${t.ratedOn}`}
-            src={(lang === "ru" && t.posterRu) || t.poster}
-            title={(lang === "ru" && t.titleRu) || t.title}
+            src={mediaPoster(t, lang)}
+            title={mediaTitle(t, lang)}
             year={t.year}
             rating={t.userRating}
             href={titleHref(t)}
@@ -465,10 +467,6 @@ function ToggledPosterRow({
   const current = (side === "b" && hasB) || !hasA ? b : a;
   const active = current === b ? "b" : "a";
   if (!hasA && !hasB) return null;
-  const posterOf = (card: TitleCard) =>
-    (lang === "ru" && card.posterRu) || card.poster;
-  const titleOf = (card: TitleCard) =>
-    (lang === "ru" && card.titleRu) || card.title;
   return (
     <section className={className ? `block ${className}` : "block"}>
       {hasA && hasB ? (
@@ -487,8 +485,8 @@ function ToggledPosterRow({
         {current.items.map((t) => (
           <Poster
             key={`${t.id}-${t.title}-${t.ratedOn}`}
-            src={posterOf(t)}
-            title={titleOf(t)}
+            src={mediaPoster(t, lang)}
+            title={mediaTitle(t, lang)}
             year={t.year}
             rating={t.userRating}
             href={titleHref(t)}
@@ -591,8 +589,8 @@ function HighsAndLowsBlock({
             <div key={cell.key} className="highs-item">
               <span className="highs-label">{cell.label}</span>
               <Poster
-                src={card.poster}
-                title={card.title}
+                src={mediaPoster(card, lang)}
+                title={mediaTitle(card, lang)}
                 year={card.year}
                 rating={card.userRating}
                 href={titleHref(card)}
@@ -635,10 +633,6 @@ function BestOfYear({
   const nine = items.slice(1, 10);
   const ten = items.slice(10, 20);
   const count = Math.min(20, items.length);
-  const posterOf = (card: TitleCard) =>
-    (lang === "ru" && card.posterRu) || card.poster;
-  const titleOf = (card: TitleCard) =>
-    (lang === "ru" && card.titleRu) || card.title;
   return (
     <section className="block bestof">
       <div className="bestof-head">
@@ -661,8 +655,8 @@ function BestOfYear({
       </div>
       <div className="bestof-lead">
         <Poster
-          src={posterOf(lead)}
-          title={titleOf(lead)}
+          src={mediaPoster(lead, lang)}
+          title={mediaTitle(lead, lang)}
           year={lead.year}
           rating={lead.userRating}
           href={titleHref(lead)}
@@ -673,8 +667,8 @@ function BestOfYear({
         {nine.map((card) => (
           <Poster
             key={card.id || card.title}
-            src={posterOf(card)}
-            title={titleOf(card)}
+            src={mediaPoster(card, lang)}
+            title={mediaTitle(card, lang)}
             year={card.year}
             rating={card.userRating}
             href={titleHref(card)}
@@ -687,8 +681,8 @@ function BestOfYear({
           {ten.map((card) => (
             <Poster
               key={card.id || card.title}
-              src={posterOf(card)}
-              title={titleOf(card)}
+              src={mediaPoster(card, lang)}
+              title={mediaTitle(card, lang)}
               year={card.year}
               rating={card.userRating}
               href={titleHref(card)}
@@ -717,10 +711,6 @@ function MilestonesBlock({
   const { lang, t } = useLocale();
   if (!stats.first && !stats.last) return null;
   const marks = stats.milestones || [];
-  const posterOf = (card: TitleCard) =>
-    (lang === "ru" && card.posterRu) || card.poster;
-  const titleOf = (card: TitleCard) =>
-    (lang === "ru" && card.titleRu) || card.title;
   return (
     <section className="block milestones">
       <h2>{t.milestones}</h2>
@@ -729,8 +719,8 @@ function MilestonesBlock({
           <article className="milestone-end">
             <h3>{t.firstRated(kind)}</h3>
             <Poster
-              src={posterOf(stats.first)}
-              title={titleOf(stats.first)}
+              src={mediaPoster(stats.first, lang)}
+              title={mediaTitle(stats.first, lang)}
               year={stats.first.year}
               rating={stats.first.userRating}
               href={titleHref(stats.first)}
@@ -745,8 +735,8 @@ function MilestonesBlock({
               {marks.map((card) => (
                 <article key={`${card.n}-${card.id || card.title}`} className="milestone-card">
                   <Poster
-                    src={posterOf(card)}
-                    title={titleOf(card)}
+                    src={mediaPoster(card, lang)}
+                    title={mediaTitle(card, lang)}
                     year={card.year}
                     rating={card.userRating}
                     href={titleHref(card)}
@@ -762,8 +752,8 @@ function MilestonesBlock({
           <article className="milestone-end last">
             <h3>{t.mostRecent(kind)}</h3>
             <Poster
-              src={posterOf(stats.last)}
-              title={titleOf(stats.last)}
+              src={mediaPoster(stats.last, lang)}
+              title={mediaTitle(stats.last, lang)}
               year={stats.last.year}
               rating={stats.last.userRating}
               href={titleHref(stats.last)}
@@ -1415,8 +1405,8 @@ function WatchlistBlock({
         {added.map((item) => (
           <Poster
             key={item.id}
-            src={item.poster}
-            title={item.title}
+            src={mediaPoster(item, lang)}
+            title={mediaTitle(item, lang)}
             year={item.year}
             href={item.url}
             watchlisted
@@ -1433,7 +1423,7 @@ function isIndianTitle(item: WatchlistItem) {
 }
 
 function YetToSee({ items, kind }: { items: WatchlistItem[]; kind: CatalogKind }) {
-  const { t } = useLocale();
+  const { t, lang } = useLocale();
   const pool = useMemo(() => {
     const eligible = items.filter(
       (item) =>
@@ -1458,8 +1448,8 @@ function YetToSee({ items, kind }: { items: WatchlistItem[]; kind: CatalogKind }
         {pool.map((item) => (
           <Poster
             key={item.id}
-            src={item.poster}
-            title={item.title}
+            src={mediaPoster(item, lang)}
+            title={mediaTitle(item, lang)}
             year={item.year}
             rating={item.imdbRating}
             href={item.url}
@@ -1776,8 +1766,8 @@ export default function App() {
               {stats.series.map((s) => (
                 <Poster
                   key={s.id || s.name}
-                  src={s.poster}
-                  title={s.name}
+                  src={mediaPoster(s, lang)}
+                  title={mediaTitle(s, lang)}
                   year={s.year}
                   href={s.id ? `https://www.imdb.com/title/${s.id}/` : undefined}
                   caption={t.episodesRated(s.count)}
@@ -1955,8 +1945,8 @@ export default function App() {
                 {wrapped.profile.favorites.map((card) => (
                   <Poster
                     key={card.id}
-                    src={card.poster}
-                    title={card.title}
+                    src={mediaPoster(card, lang)}
+                    title={mediaTitle(card, lang)}
                     year={card.year}
                     rating={card.userRating}
                     href={titleHref(card)}

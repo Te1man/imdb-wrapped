@@ -27,9 +27,11 @@ export type PersonStat = {
 
 export type NamedCount = {
   name: string;
+  titleRu?: string | null;
   count: number;
   id?: string | null;
   poster?: string | null;
+  posterRu?: string | null;
   year?: number | null;
   avgRating?: number | null;
 };
@@ -137,10 +139,12 @@ export type WrappedData = {
 export type WatchlistItem = {
   id: string;
   title: string;
+  titleRu?: string | null;
   originalTitle?: string | null;
   year?: number | null;
   type?: string;
   poster?: string | null;
+  posterRu?: string | null;
   imdbRating?: number | null;
   votes?: number | null;
   runtimeMin?: number | null;

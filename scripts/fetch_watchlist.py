@@ -57,6 +57,16 @@ query($ids: [ID!]!) {
 }
 """
 
+LOCAL_QUERY = """
+query($ids: [ID!]!) {
+  titles(ids: $ids) {
+    id
+    titleText { text }
+    primaryImage { url }
+  }
+}
+"""
+
 
 def poster_thumb(url: str | None, width: int = 320) -> str | None:
     if not url:
@@ -64,25 +74,60 @@ def poster_thumb(url: str | None, width: int = 320) -> str | None:
     return re.sub(r"\._V1_.*$", f"._V1_UX{width}.jpg", url)
 
 
-def gql(query: str, variables: dict | None = None) -> dict:
+def gql(
+    query: str,
+    variables: dict | None = None,
+    language: str = "en-US",
+    country: str | None = None,
+) -> dict:
     payload: dict = {"query": query}
     if variables:
         payload["variables"] = variables
+    headers = {
+        "User-Agent": UA,
+        "content-type": "application/json",
+        "origin": "https://www.imdb.com",
+        "referer": "https://www.imdb.com/",
+        "x-imdb-client-name": "imdb-web-next",
+        "x-imdb-user-language": language,
+    }
+    if country:
+        headers["x-imdb-user-country"] = country
     req = urllib.request.Request(
         GQL_URL,
         data=json.dumps(payload).encode(),
-        headers={
-            "User-Agent": UA,
-            "content-type": "application/json",
-            "origin": "https://www.imdb.com",
-            "referer": "https://www.imdb.com/",
-            "x-imdb-client-name": "imdb-web-next",
-            "x-imdb-user-language": "en-US",
-        },
+        headers=headers,
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode())
 
+
+def apply_ru_locale(items: list[dict]) -> None:
+    ids = sorted({tid for it in items if (tid := it.get("id"))})
+    if not ids:
+        return
+    print(f"GraphQL RU watchlist {len(ids)}...", flush=True)
+    local: dict[str, dict] = {}
+    for i in range(0, len(ids), 40):
+        batch = ids[i : i + 40]
+        try:
+            data = gql(LOCAL_QUERY, {"ids": batch}, language="ru-RU", country="RU")
+            for t in (data.get("data") or {}).get("titles") or []:
+                if t and t.get("id"):
+                    local[t["id"]] = t
+        except Exception as exc:  # noqa: BLE001
+            print(f"  gql ru fail: {exc}", flush=True)
+        time.sleep(0.08)
+    for it in items:
+        t = local.get(it.get("id") or "")
+        if not t:
+            continue
+        title_ru = ((t.get("titleText") or {}).get("text") or "").strip()
+        poster_ru = poster_thumb((t.get("primaryImage") or {}).get("url"))
+        if title_ru and title_ru != it.get("title"):
+            it["titleRu"] = title_ru
+        if poster_ru and poster_ru != it.get("poster"):
+            it["posterRu"] = poster_ru
 
 def parse_csv(path: Path) -> list[dict]:
     items = []
@@ -206,6 +251,7 @@ def enrich(items: list[dict]) -> list[dict]:
         ]
         if countries:
             it["countries"] = countries
+    apply_ru_locale(items)
     return items
 
 

@@ -1061,7 +1061,12 @@ def fetch_ru_titles(ids: list[str]) -> dict[str, dict]:
 
 
 def apply_ru_locale(items: list[dict]) -> None:
-    ids = sorted({tid for it in items if (tid := it.get("id"))})
+    ids = sorted({
+        tid
+        for it in items
+        for tid in (it.get("id"), it.get("seriesId"))
+        if tid
+    })
     if not ids:
         return
     print(f"GraphQL RU titles {len(ids)}...", flush=True)
@@ -1069,6 +1074,33 @@ def apply_ru_locale(items: list[dict]) -> None:
     for it in items:
         tid = it.get("id")
         t = local.get(tid or "")
+        if t:
+            title_ru = ((t.get("titleText") or {}).get("text") or "").strip()
+            poster_ru = poster_thumb((t.get("primaryImage") or {}).get("url"))
+            if title_ru and title_ru != it.get("title"):
+                it["titleRu"] = title_ru
+            if poster_ru and poster_ru != it.get("poster"):
+                it["posterRu"] = poster_ru
+        sid = it.get("seriesId")
+        st = local.get(sid or "")
+        if not st:
+            continue
+        series_title_ru = ((st.get("titleText") or {}).get("text") or "").strip()
+        series_poster_ru = poster_thumb((st.get("primaryImage") or {}).get("url"))
+        if series_title_ru and series_title_ru != it.get("series"):
+            it["seriesTitleRu"] = series_title_ru
+        if series_poster_ru and series_poster_ru != it.get("seriesPoster"):
+            it["seriesPosterRu"] = series_poster_ru
+
+
+def apply_ru_cards(cards: list[dict]) -> None:
+    """Add titleRu/posterRu onto compact title cards (favorites, etc.)."""
+    ids = sorted({tid for it in cards if (tid := it.get("id"))})
+    if not ids:
+        return
+    local = fetch_ru_titles(ids)
+    for it in cards:
+        t = local.get(it.get("id") or "")
         if not t:
             continue
         title_ru = ((t.get("titleText") or {}).get("text") or "").strip()
@@ -1838,6 +1870,8 @@ def stats_for(
     keywords, keywords_rated = named_tag_stats(items, keyword_tags, n=12, min_rated=min_rated)
     series_c = Counter()
     series_poster = {}
+    series_poster_ru = {}
+    series_title_ru = {}
     series_year = {}
     series_id = {}
     for it in items:
@@ -1847,6 +1881,10 @@ def stats_for(
             series_id.setdefault(name, it.get("seriesId"))
             if it.get("seriesPoster"):
                 series_poster.setdefault(name, it["seriesPoster"])
+            if it.get("seriesPosterRu"):
+                series_poster_ru.setdefault(name, it["seriesPosterRu"])
+            if it.get("seriesTitleRu"):
+                series_title_ru.setdefault(name, it["seriesTitleRu"])
             if it.get("seriesYear"):
                 series_year.setdefault(name, it["seriesYear"])
         elif type_id_of(it) in SERIES_SHOW_TYPES and it.get("title"):
@@ -1854,6 +1892,10 @@ def stats_for(
             series_id.setdefault(name, it.get("id"))
             if it.get("poster"):
                 series_poster[name] = it["poster"]
+            if it.get("posterRu"):
+                series_poster_ru[name] = it["posterRu"]
+            if it.get("titleRu"):
+                series_title_ru[name] = it["titleRu"]
             if it.get("releaseYear"):
                 series_year.setdefault(name, it["releaseYear"])
     day_counts = Counter(it["ratedOn"] for it in items)
@@ -1983,6 +2025,16 @@ def stats_for(
                 "count": v,
                 "poster": series_poster.get(k),
                 "year": series_year.get(k),
+                **(
+                    {"titleRu": series_title_ru[k]}
+                    if series_title_ru.get(k)
+                    else {}
+                ),
+                **(
+                    {"posterRu": series_poster_ru[k]}
+                    if series_poster_ru.get(k)
+                    else {}
+                ),
             }
             for k, v in series_c.most_common(10)
             if v >= 2
@@ -2035,6 +2087,10 @@ def stats_bundle(items: list[dict], year: int | None) -> dict:
 
 def build(items: list[dict]) -> dict:
     identity = hydrate_identity()
+    favorites = list(identity.get("favorites") or [])
+    if favorites:
+        print(f"GraphQL RU favorites {len(favorites)}...", flush=True)
+        apply_ru_cards(favorites)
     names = display_names(CFG, identity.get("username") or "User")
     years = sorted({it["ratedYear"] for it in items}, reverse=True)
     by_year = {str(y): stats_bundle([it for it in items if it["ratedYear"] == y], y) for y in years}
@@ -2054,7 +2110,7 @@ def build(items: list[dict]) -> dict:
             ],
             "interests": fetch_profile_interests(),
             "favoritePeople": fetch_favorite_people(),
-            "favorites": identity.get("favorites") or [],
+            "favorites": favorites,
             "displayName": names,
             "telegram": telegram_url(CFG),
         },
