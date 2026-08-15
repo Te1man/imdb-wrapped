@@ -2075,15 +2075,16 @@ export default function App() {
           <span>
             {t.footerCredit}
             <a href={wrapped.profile.url} target="_blank" rel="noreferrer">
-              {t.displayName}
+              {wrapped.profile.username || t.displayName}
             </a>
+            .
           </span>
           <span>
             {t.footerOpenBefore}
             <a href={REPO_URL} target="_blank" rel="noreferrer">
               {t.footerOpenLink}
             </a>
-            {t.footerOpenAfter}
+            {t.footerOpenAfter}.
           </span>
           {wrapped.profile.telegram ? (
             <span>
