@@ -98,7 +98,7 @@ export function formatKindCount(
 
 export const MONTHS: Record<Lang, string[]> = {
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-  ru: ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"],
+  ru: ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"],
 };
 
 function parseIsoDate(iso: string | null | undefined) {
@@ -807,7 +807,7 @@ export const copy: Record<Lang, Copy> = {
       kind === "series" ? "Последний сериал" : kind === "movies" ? "Последний фильм" : "Последняя картина",
     milestones: "Рубежи",
     ratingMilestones: "Рубежи оценок",
-    ordinal: (n) => `${n}-й`,
+    ordinal: (n) => String(n),
     mostActiveDay: "Самый активный день",
     titlesOn: (n, date) =>
       `${n.toLocaleString("ru-RU")} ${pluralRu(n, "картина", "картины", "картин")} · ${date}`,

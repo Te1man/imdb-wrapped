@@ -322,8 +322,12 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"live fetch skipped: {exc}", flush=True)
     items = enrich(items)
+    body = json.dumps(payload(items, source), ensure_ascii=False)
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(payload(items, source), ensure_ascii=False))
+    OUT.write_text(body)
+    public_data = ROOT / "public" / "data"
+    public_data.mkdir(parents=True, exist_ok=True)
+    (public_data / "watchlist.json").write_text(body)
     posters = sum(1 for it in items if it.get("poster"))
     print(f"Wrote {OUT} ({len(items)} titles, {posters} posters, source={source})", flush=True)
     return 0

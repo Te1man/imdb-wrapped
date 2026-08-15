@@ -6,8 +6,7 @@ import {
   type Copy,
   type Lang,
 } from "./i18n";
-import type { WrappedData } from "./types";
-import data from "./data/stats.json";
+import { useData } from "./DataContext";
 
 type LocaleCtx = {
   lang: Lang;
@@ -17,18 +16,8 @@ type LocaleCtx = {
 
 const Ctx = createContext<LocaleCtx | null>(null);
 
-function displayNames() {
-  const profile = (data as WrappedData).profile;
-  const fallback = profile.username || "User";
-  const names = profile.displayName;
-  return {
-    en: names?.en || fallback,
-    ru: names?.ru || names?.en || fallback,
-    ruGenitive: names?.ruGenitive || names?.ru || names?.en || fallback,
-  };
-}
-
 export function LocaleProvider({ children }: { children: ReactNode }) {
+  const { wrapped } = useData();
   const [lang, setLangState] = useState<Lang>(detectLang);
 
   useEffect(() => {
@@ -40,13 +29,24 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     setLangState(next);
   };
 
+  const names = useMemo(() => {
+    const profile = wrapped.profile;
+    const fallback = profile.username || "User";
+    const dn = profile.displayName;
+    return {
+      en: dn?.en || fallback,
+      ru: dn?.ru || dn?.en || fallback,
+      ruGenitive: dn?.ruGenitive || dn?.ru || dn?.en || fallback,
+    };
+  }, [wrapped.profile]);
+
   const value = useMemo<LocaleCtx>(
     () => ({
       lang,
       setLang,
-      t: namedCopy(lang, displayNames()),
+      t: namedCopy(lang, names),
     }),
-    [lang],
+    [lang, names],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

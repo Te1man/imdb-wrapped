@@ -810,10 +810,10 @@ def fetch_list_first_dates(list_id: str | None) -> dict[str, str]:
     return out
 
 
-def fetch_all_user_ratings() -> dict[str, dict]:
+def fetch_all_user_ratings(force: bool = False) -> dict[str, dict]:
     """Latest score + last-modified date for every public rating."""
     cache_path = CACHE / "user-ratings.json"
-    if cache_path.exists():
+    if not force and cache_path.exists():
         cached = json.loads(cache_path.read_text())
         rows = cached.get("ratings") if isinstance(cached, dict) else None
         if isinstance(rows, dict) and rows:
@@ -857,10 +857,71 @@ def fetch_all_user_ratings() -> dict[str, dict]:
         print(f"  userRatings fail: {exc}", flush=True)
         if cache_path.exists():
             return (json.loads(cache_path.read_text()).get("ratings") or {})
+        return out
     CACHE.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps({"count": len(out), "ratings": out}, ensure_ascii=False))
     print(f"Wrote {cache_path} ({len(out)} titles, {pages} pages)", flush=True)
     return out
+
+
+def stub_from_live_rating(tid: str, rating: dict) -> dict:
+    dated = rating["date"]
+    dt = datetime.strptime(dated, "%Y-%m-%d")
+    return {
+        "id": tid,
+        "title": tid,
+        "ratedOn": dated,
+        "lastRatedOn": dated,
+        "ratedYear": dt.year,
+        "ratedMonth": dt.month,
+        "ratedDay": dt.day,
+        "type": "movie",
+        "typeId": "movie",
+        "releaseYear": None,
+        "releaseDate": None,
+        "runtimeMin": None,
+        "userRating": rating["value"],
+        "imdbRating": None,
+        "votes": None,
+        "genres": [],
+        "directors": [],
+        "stars": [],
+        "url": f"https://www.imdb.com/title/{tid}/",
+        "poster": None,
+    }
+
+
+def merge_live_ratings(items: list[dict], *, force: bool = False) -> list[dict]:
+    """Update scores from live GraphQL and append brand-new rated titles."""
+    hydrate_identity()
+    live = fetch_all_user_ratings(force=force)
+    if not live:
+        return items
+    by_id = {it["id"]: it for it in items if it.get("id")}
+    score_updated = 0
+    for tid, g in live.items():
+        it = by_id.get(tid)
+        if not it:
+            continue
+        if it.get("userRating") != g["value"]:
+            it["userRating"] = g["value"]
+            score_updated += 1
+        it["lastRatedOn"] = g["date"]
+        # Keep first-seen ratedOn for year buckets; only bump if missing.
+        if not it.get("ratedOn"):
+            it["ratedOn"] = g["date"]
+            it["ratedYear"] = int(g["date"][:4])
+            it["ratedMonth"] = int(g["date"][5:7])
+            it["ratedDay"] = int(g["date"][8:10])
+    new_ids = [tid for tid in live if tid not in by_id]
+    stubs = [stub_from_live_rating(tid, live[tid]) for tid in new_ids]
+    if stubs:
+        print(f"Live ratings: +{len(stubs)} new titles, {score_updated} score updates", flush=True)
+    elif score_updated:
+        print(f"Live ratings: {score_updated} score updates", flush=True)
+    else:
+        print(f"Live ratings: {len(live)} titles, no changes", flush=True)
+    return items + stubs
 
 
 def apply_first_rated(items: list[dict]) -> list[dict]:
@@ -1060,12 +1121,21 @@ def fetch_ru_titles(ids: list[str]) -> dict[str, dict]:
     return out
 
 
-def apply_ru_locale(items: list[dict]) -> None:
+def apply_ru_locale(items: list[dict], *, force: bool = False) -> None:
+    done_path = CACHE / "ru-locale-done.json"
+    done: set[str] = set()
+    if done_path.exists() and not force:
+        try:
+            raw = json.loads(done_path.read_text())
+            if isinstance(raw, list):
+                done = set(raw)
+        except Exception:  # noqa: BLE001
+            done = set()
     ids = sorted({
         tid
         for it in items
         for tid in (it.get("id"), it.get("seriesId"))
-        if tid
+        if tid and (force or tid not in done)
     })
     if not ids:
         return
@@ -1091,6 +1161,9 @@ def apply_ru_locale(items: list[dict]) -> None:
             it["seriesTitleRu"] = series_title_ru
         if series_poster_ru and series_poster_ru != it.get("seriesPoster"):
             it["seriesPosterRu"] = series_poster_ru
+    done.update(ids)
+    CACHE.mkdir(parents=True, exist_ok=True)
+    done_path.write_text(json.dumps(sorted(done)))
 
 
 def apply_ru_cards(cards: list[dict]) -> None:
@@ -1472,6 +1545,9 @@ def enrich(items: list[dict], graphql: bool = True) -> list[dict]:
             it["keywords"] = keywords_of(st)
     apply_ru_locale(items)
     return items
+
+
+IMDB_GENRES = {
     "Action",
     "Adventure",
     "Animation",
@@ -2129,14 +2205,33 @@ def build(items: list[dict]) -> dict:
     return payload
 
 
+def write_stats_payload(payload: dict) -> Path:
+    OUT.mkdir(parents=True, exist_ok=True)
+    public_data = ROOT / "public" / "data"
+    public_data.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload, ensure_ascii=False)
+    dest = OUT / "stats.json"
+    dest.write_text(text)
+    (public_data / "stats.json").write_text(text)
+    return dest
+
+
 def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--fast", action="store_true", help="Skip GraphQL, suggestion posters only")
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Force-refresh public IMDb ratings and merge brand-new titles",
+    )
     args = parser.parse_args()
     hydrate_identity()
-    items = apply_first_rated(load_all())
+    items = load_all()
+    if args.live:
+        items = merge_live_ratings(items, force=True)
+    items = apply_first_rated(items)
     print(f"Parsed {len(items)} ratings across years {sorted({i['ratedYear'] for i in items})}")
     types = Counter(i.get("type") for i in items)
     print("types", dict(types))
@@ -2145,9 +2240,8 @@ def main() -> None:
     items = enrich(items, graphql=not args.fast)
     (CACHE / "enriched.json").write_text(json.dumps(items, ensure_ascii=False))
     payload = build(items)
-    OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "stats.json").write_text(json.dumps(payload, ensure_ascii=False))
-    print("Wrote", OUT / "stats.json", "years", payload["years"], "coverage", payload["coverage"])
+    dest = write_stats_payload(payload)
+    print("Wrote", dest, "years", payload["years"], "coverage", payload["coverage"])
 
 
 if __name__ == "__main__":

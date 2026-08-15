@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { CatalogKind, HighsAndLows, PersonStat, TitleCard, WatchlistData, WatchlistItem, WrappedData, YearStats } from "./types";
-import data from "./data/stats.json";
-import fallbackWatchlist from "./data/watchlist.json";
+import type { CatalogKind, HighsAndLows, TitleCard, WatchlistData, WatchlistItem, WrappedData, YearStats } from "./types";
+import { FALLBACK_STATS, useData } from "./DataContext";
 import { WorldMapBlock } from "./WorldMap";
 import { ThemesKeywords } from "./ThemesKeywords";
 import { useLocale } from "./LocaleContext";
@@ -25,7 +24,6 @@ import {
   type Lang,
 } from "./i18n";
 
-const wrapped = data as WrappedData;
 const KINDS: CatalogKind[] = ["movies", "series", "all"];
 const MOVIE_TYPES = new Set([
   "movie",
@@ -104,16 +102,16 @@ function yearByline(year: string, toDate: boolean, kind: CatalogKind, t: Copy) {
   return t.yearInFilm;
 }
 
-function readYearParam(): string {
+function readYearParam(data: WrappedData = FALLBACK_STATS): string {
   const y = new URLSearchParams(window.location.search).get("year");
   if (y === "all") return "all";
-  if (y && wrapped.byYear[y]) return y;
-  return String(wrapped.defaultYear);
+  if (y && data.byYear[y]) return y;
+  return String(data.defaultYear);
 }
 
-function setYearParam(year: string) {
+function setYearParam(year: string, data: WrappedData) {
   const url = new URL(window.location.href);
-  if (year === String(wrapped.defaultYear)) url.searchParams.delete("year");
+  if (year === String(data.defaultYear)) url.searchParams.delete("year");
   else url.searchParams.set("year", year);
   window.history.replaceState({}, "", url);
 }
@@ -257,8 +255,8 @@ function WeekdayChart({ daily, kind }: { daily: Record<string, number>; kind: Ca
   );
 }
 
-function titleHref(t: TitleCard) {
-  return t.url || (t.id ? `https://www.imdb.com/title/${t.id}/` : wrapped.profile.url);
+function titleHref(t: TitleCard, profileUrl?: string) {
+  return t.url || (t.id ? `https://www.imdb.com/title/${t.id}/` : profileUrl || FALLBACK_STATS.profile.url);
 }
 
 function useRevealOnScroll(resetKey: string) {
@@ -623,6 +621,7 @@ function BestOfYear({
   kind: CatalogKind;
 }) {
   const { lang, t } = useLocale();
+  const { wrapped } = useData();
   const canBest = best.length >= 2;
   const canWorst = worst.length >= 2;
   const [mode, setMode] = useState<"best" | "worst">(canBest ? "best" : "worst");
@@ -734,15 +733,23 @@ function MilestonesBlock({
             <div className="milestone-grid">
               {marks.map((card) => (
                 <article key={`${card.n}-${card.id || card.title}`} className="milestone-card">
-                  <Poster
-                    src={mediaPoster(card, lang)}
-                    title={mediaTitle(card, lang)}
-                    year={card.year}
-                    rating={card.userRating}
-                    href={titleHref(card)}
-                  />
-                  <strong>{t.ordinal(card.n)}</strong>
-                  <p>{milestoneDate(card.ratedOn, year, lang)}</p>
+                  <div className="milestone-frame">
+                    <div className="milestone-frame-inner">
+                      <div className="milestone-plate">
+                        <strong>{t.ordinal(card.n)}</strong>
+                      </div>
+                      <div className="milestone-art">
+                        <Poster
+                          src={mediaPoster(card, lang)}
+                          title={mediaTitle(card, lang)}
+                          year={card.year}
+                          rating={card.userRating}
+                          href={titleHref(card)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="milestone-date">{milestoneDate(card.ratedOn, year, lang)}</p>
                 </article>
               ))}
             </div>
@@ -1081,13 +1088,14 @@ function YearlyActivityBlock({
   onSelectYear: (y: string) => void;
 }) {
   const { t } = useLocale();
+  const { wrapped } = useData();
   const years = useMemo(() => {
     const listed = [...wrapped.years].sort((a, b) => a - b);
     if (!listed.length) return listed;
     const start = listed[0];
     const end = listed[listed.length - 1];
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-  }, []);
+  }, [wrapped.years]);
   const rows = years.map((y) => {
     const stats = wrapped.byYear[String(y)]?.[kind] ?? wrapped.byYear[String(y)]?.all;
     return { year: y, count: stats?.count ?? 0, posters: yearPosters(stats) };
@@ -1466,6 +1474,7 @@ function InterestsBlock({
   items?: WrappedData["profile"]["interests"];
 }) {
   const { t, lang } = useLocale();
+  const { wrapped } = useData();
   if (!items?.length) return null;
   return (
     <section className="block interests">
@@ -1494,9 +1503,9 @@ function InterestsBlock({
 
 export default function App() {
   const { lang, setLang, t } = useLocale();
-  const [year, setYear] = useState(readYearParam);
+  const { wrapped, watchlist } = useData();
+  const [year, setYear] = useState(() => readYearParam(FALLBACK_STATS));
   const [kind, setKind] = useState<CatalogKind>(readKindParam);
-  const [watchlist, setWatchlist] = useState<WatchlistData>(fallbackWatchlist as WatchlistData);
   const bundle = (year === "all" ? wrapped.allTime : wrapped.byYear[year]) ?? wrapped.allTime;
   const stats: YearStats = bundle[kind] ?? bundle.all;
   const watchlistedIds = useMemo(
@@ -1504,34 +1513,21 @@ export default function App() {
     [watchlist],
   );
 
+  useEffect(() => {
+    if (year !== "all" && !wrapped.byYear[year]) {
+      setYear(String(wrapped.defaultYear));
+    }
+  }, [wrapped, year]);
+
   useRevealOnScroll(`${year}-${kind}-${stats.count}`);
 
   useEffect(() => {
-    setYearParam(year);
+    setYearParam(year, wrapped);
     setKindParam(kind);
     const yearLabel = year === "all" ? t.allTime : stats.label;
     const kindLabel = kind === "all" ? "" : ` · ${kind === "movies" ? t.kindMovies : t.kindSeries}`;
     document.title = `${t.displayName} · ${yearLabel}${kindLabel} · IMDb Wrapped`;
-  }, [year, kind, stats.label, t.allTime, t.displayName, t.kindMovies, t.kindSeries]);
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    let alive = true;
-    const pull = () => {
-      fetch("/api/watchlist")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: WatchlistData | null) => {
-          if (alive && d?.items?.length) setWatchlist(d);
-        })
-        .catch(() => undefined);
-    };
-    pull();
-    const id = window.setInterval(pull, 120_000);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-    };
-  }, []);
+  }, [year, kind, stats.label, t.allTime, t.displayName, t.kindMovies, t.kindSeries, wrapped]);
 
   const maxSpread = Math.max(1, ...Object.values(stats.ratingsSpread));
   const maxGenre = Math.max(1, ...stats.genres.map((g) => g.count));
